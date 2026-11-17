@@ -9,9 +9,12 @@ import SwiftUI
 
 @main
 struct doveHuntApp: App {
+    @State private var records = HuntRecords()
+
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .environment(records)
         }
     }
 }
