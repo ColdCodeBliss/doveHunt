@@ -24,9 +24,12 @@ nonisolated enum GameStore {
         static let score = "score"
         static let huntDoves = "huntDoves"
         static let wave = "wave"
+        static let huntStartWave = "huntStartWave"
         static let shotDoveIDs = "shotDoveIDs"
         static let lastHitDoveID = "lastHitDoveID"
-        static let lastHitDate = "lastHitDate"
+        static let lastShotDate = "lastShotDate"
+        static let lastMissTarget = "lastMissTarget"
+        static let lastShotTick = "lastShotTick"
         static let lifetimeDoves = "lifetimeDoves"
         static let lifetimeWaves = "lifetimeWaves"
         static let topScores = "topScores"
@@ -46,15 +49,22 @@ nonisolated enum GameStore {
     /// Increments each time a wave of doves is cleared; seeds the next wave's layout.
     static var wave: Int { defaults.integer(forKey: Key.wave) }
 
+    /// The wave the current hunt started on. Doves fly faster with each wave cleared since then.
+    static var huntStartWave: Int { defaults.integer(forKey: Key.huntStartWave) }
+
     static var shotDoveIDs: Set<String> {
         Set(defaults.stringArray(forKey: Key.shotDoveIDs) ?? [])
     }
 
-    /// The most recent hit, used to show the feather "poof" right after a shot.
-    static var lastHit: (doveID: String, date: Date)? {
-        guard let id = defaults.string(forKey: Key.lastHitDoveID),
-              let date = defaults.object(forKey: Key.lastHitDate) as? Date else { return nil }
-        return (id, date)
+    /// The most recent trigger pull, used to flash and aim the shotgun (and poof the dove, if
+    /// it was a hit). `hitDoveID` is nil for a miss; `missTarget` is where a miss was aimed,
+    /// in art pixels, when known; `tick` is the widget's flight frame that was on screen.
+    static var lastShot: (date: Date, hitDoveID: String?, missTarget: CGPoint?, tick: Int?)? {
+        guard let date = defaults.object(forKey: Key.lastShotDate) as? Date else { return nil }
+        let target = (defaults.array(forKey: Key.lastMissTarget) as? [Double])
+            .flatMap { $0.count == 2 ? CGPoint(x: $0[0], y: $0[1]) : nil }
+        let tick = defaults.object(forKey: Key.lastShotTick) as? Int
+        return (date, defaults.string(forKey: Key.lastHitDoveID), target, tick)
     }
 
     // MARK: Lifetime stats
@@ -72,7 +82,7 @@ nonisolated enum GameStore {
     // MARK: Mutations
 
     /// Records a hit, awards points, and advances to a new wave once every dove is down.
-    static func registerHit(doveID: String, waveSize: Int) {
+    static func registerHit(doveID: String, waveSize: Int, tick: Int? = nil) {
         var shot = shotDoveIDs
         guard !shot.contains(doveID) else { return }
         shot.insert(doveID)
@@ -81,7 +91,9 @@ nonisolated enum GameStore {
         defaults.set(huntDoves + 1, forKey: Key.huntDoves)
         defaults.set(lifetimeDoves + 1, forKey: Key.lifetimeDoves)
         defaults.set(doveID, forKey: Key.lastHitDoveID)
-        defaults.set(Date(), forKey: Key.lastHitDate)
+        defaults.removeObject(forKey: Key.lastMissTarget)
+        setShotTick(tick)
+        defaults.set(Date(), forKey: Key.lastShotDate)
 
         if shot.count >= waveSize {
             defaults.set(wave + 1, forKey: Key.wave)
@@ -89,6 +101,18 @@ nonisolated enum GameStore {
             shot.removeAll()
         }
         defaults.set(Array(shot), forKey: Key.shotDoveIDs)
+    }
+
+    /// Records a shot that hit nothing, so the shotgun still fires (aimed at `target`, if known).
+    static func registerMiss(target: CGPoint?, tick: Int? = nil) {
+        defaults.removeObject(forKey: Key.lastHitDoveID)
+        setShotTick(tick)
+        if let target {
+            defaults.set([Double(target.x), Double(target.y)], forKey: Key.lastMissTarget)
+        } else {
+            defaults.removeObject(forKey: Key.lastMissTarget)
+        }
+        defaults.set(Date(), forKey: Key.lastShotDate)
     }
 
     /// Archives the current hunt into the top scores (if it scored) and starts fresh with a new wave.
@@ -102,10 +126,22 @@ nonisolated enum GameStore {
         }
         defaults.set(0, forKey: Key.score)
         defaults.set(0, forKey: Key.huntDoves)
-        defaults.set(wave + 1, forKey: Key.wave)
+        let freshWave = wave + 1
+        defaults.set(freshWave, forKey: Key.wave)
+        defaults.set(freshWave, forKey: Key.huntStartWave)
         defaults.removeObject(forKey: Key.shotDoveIDs)
         defaults.removeObject(forKey: Key.lastHitDoveID)
-        defaults.removeObject(forKey: Key.lastHitDate)
+        defaults.removeObject(forKey: Key.lastShotDate)
+        defaults.removeObject(forKey: Key.lastMissTarget)
+        defaults.removeObject(forKey: Key.lastShotTick)
+    }
+
+    private static func setShotTick(_ tick: Int?) {
+        if let tick {
+            defaults.set(tick, forKey: Key.lastShotTick)
+        } else {
+            defaults.removeObject(forKey: Key.lastShotTick)
+        }
     }
 
     static func clearTopScores() {

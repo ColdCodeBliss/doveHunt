@@ -537,6 +537,31 @@ def shotgun(firing):
     return c
 
 
+# The aimed shotgun leans this many pixels sideways per row of height (~27 degrees),
+# pivoting on the bottom of the stock so the gun stays planted at bottom-center.
+GUN_AIM_SHEAR = 0.5
+
+
+def shotgun_aimed(firing, direction):
+    """The shotgun tilted toward `direction` ('left' or 'right') by shearing the upright sprite.
+
+    Each row shifts sideways in proportion to its height above the stock, which gives a
+    clean stair-stepped pixel diagonal instead of a blurry rotation.
+    """
+    upright = shotgun(firing)
+    pivot = upright.h - 1
+    shifts = [int(math.floor((pivot - y) * GUN_AIM_SHEAR + 0.5)) for y in range(upright.h)]
+    out = Canvas(upright.w + max(shifts), upright.h)
+    for y in range(upright.h):
+        for x in range(upright.w):
+            p = upright.px[y][x]
+            if p[3]:
+                out.set(x + shifts[y], y, p)
+    if direction == "left":
+        out.px = [row[::-1] for row in out.px]
+    return out
+
+
 def digit(ch):
     """3x5 glyph in cream with a 1px drop shadow -> 4x6 sprite."""
     c = Canvas(4, 6)
@@ -737,6 +762,105 @@ def hunter():
     return outlined(c, hex_color("#26263A"))
 
 
+# MARK: - App icon
+
+APP_ICON_DIR = os.path.join(ROOT, "doveHunt", "Assets.xcassets", "AppIcon.appiconset")
+ICON_ART_SIZE = 32       # native icon art is 32x32...
+ICON_UPSCALE = 32        # ...scaled 32x with nearest-neighbor to 1024x1024
+
+
+def app_icon(variant):
+    """A dove in the crosshairs over a pixel sky. Variants: 'light', 'dark', 'tinted'."""
+    n = ICON_ART_SIZE
+    c = Canvas(n, n)
+    gy = 25
+
+    if variant == "light":
+        sky = [hex_color(v) for v in ("#1F55A8", "#2F72C4", "#4C93DC", "#74B4EC", "#A2D4F7")]
+        dithered_gradient(c, sky, 0, gy)
+        shade_blob(c, [(5.5, 5.5, 2.2), (3.5, 6.5, 1.6), (7.8, 6.3, 1.7)], None,
+                   hex_color("#BFDDF2"), hex_color("#F4FAFF"), hex_color("#FFFFFF"))
+        ground = (hex_color("#4C9F3C"), hex_color("#3D8731"), hex_color("#66B852"))
+        reticle = hex_color("#F0502E")
+    elif variant == "dark":
+        sky = [hex_color(v) for v in ("#14161D", "#23262F", "#2D313C", "#3A3F4C")]
+        dithered_gradient(c, sky, 0, gy)
+        for sx, sy in ((3, 3), (27, 5), (6, 12), (25, 19), (13, 2), (29, 13)):
+            c.set(sx, sy, hex_color("#F6E9A8"))
+        ground = (hex_color("#8C722A"), hex_color("#6E5A1C"), hex_color("#B8973A"))
+        reticle = hex_color("#F4D35E")
+    else:  # tinted: grayscale artwork on black; the system applies the tint
+        c.rect(0, 0, n, n, hex_color("#000000"))
+        ground = (hex_color("#3A3A3A"), hex_color("#2A2A2A"), hex_color("#4A4A4A"))
+        reticle = hex_color("#D0D0D0")
+
+    # Ground strip with a grassy top edge.
+    base, dark, light = ground
+    rng = random.Random(f"icon-{variant}")
+    c.rect(0, gy, n, n, base)
+    for y in range(gy, n):
+        for x in range(n):
+            if rng.random() < 0.14:
+                c.set(x, y, dark)
+    for x in range(n):
+        c.set(x, gy, light)
+        if rng.random() < 0.35:
+            c.set(x, gy - 1, base)
+
+    # The dove, centered.
+    palette = dict(SPRITE_PALETTE)
+    if variant == "tinted":
+        palette = {k: (lambda r, g, b, a: (int(0.3 * r + 0.59 * g + 0.11 * b),) * 3 + (a,))(*v)
+                   for k, v in palette.items()}
+    c.stamp(DOVE_WINGS_UP, palette, 8, 8)
+
+    # Crosshair: a continuous midpoint-circle ring with gaps on the axes and inward ticks.
+    cx, cy, r = 16, 15, 11
+    ring = set()
+    x, y, err = r, 0, 1 - r
+    while x >= y:
+        for px, py in ((x, y), (y, x), (-y, x), (-x, y), (-x, -y), (-y, -x), (y, -x), (x, -y)):
+            ring.add((px, py))
+        y += 1
+        if err < 0:
+            err += 2 * y + 1
+        else:
+            x -= 1
+            err += 2 * (y - x) + 1
+    for px, py in ring:
+        if abs(px) > 1 and abs(py) > 1:
+            c.set(cx + px, cy + py, reticle)
+    for i in range(3):
+        c.set(cx, cy - r + i, reticle)   # top tick
+        c.set(cx, cy + r - i, reticle)   # bottom tick
+        c.set(cx - r + i, cy, reticle)   # left tick
+        c.set(cx + r - i, cy, reticle)   # right tick
+    return c
+
+
+def upscale(canvas, factor):
+    return [[canvas.px[y // factor][x // factor] for x in range(canvas.w * factor)]
+            for y in range(canvas.h * factor)]
+
+
+def write_app_icon():
+    files = {"light": "AppIcon.png", "dark": "AppIcon-Dark.png", "tinted": "AppIcon-Tinted.png"}
+    for variant, filename in files.items():
+        write_png(os.path.join(APP_ICON_DIR, filename), upscale(app_icon(variant), ICON_UPSCALE))
+    contents = {
+        "images": [
+            {"filename": files["light"], "idiom": "universal", "platform": "ios", "size": "1024x1024"},
+            {"appearances": [{"appearance": "luminosity", "value": "dark"}],
+             "filename": files["dark"], "idiom": "universal", "platform": "ios", "size": "1024x1024"},
+            {"appearances": [{"appearance": "luminosity", "value": "tinted"}],
+             "filename": files["tinted"], "idiom": "universal", "platform": "ios", "size": "1024x1024"},
+        ],
+        "info": {"author": "xcode", "version": 1},
+    }
+    with open(os.path.join(APP_ICON_DIR, "Contents.json"), "w") as f:
+        json.dump(contents, f, indent=2)
+
+
 # MARK: - Main
 
 def main():
@@ -760,12 +884,16 @@ def main():
     write_imageset("feather_poof", sprite(FEATHER_POOF, SPRITE_PALETTE).px, WIDGET_OUTPUT_DIR)
     write_imageset("shotgun_idle", shotgun(False).px, WIDGET_OUTPUT_DIR)
     write_imageset("shotgun_fire", shotgun(True).px, WIDGET_OUTPUT_DIR)
+    for direction in ("left", "right"):
+        write_imageset(f"shotgun_{direction}_idle", shotgun_aimed(False, direction).px, WIDGET_OUTPUT_DIR)
+        write_imageset(f"shotgun_{direction}_fire", shotgun_aimed(True, direction).px, WIDGET_OUTPUT_DIR)
     for ch in DIGITS:
         write_imageset(f"digit_{ch}", digit(ch).px, WIDGET_OUTPUT_DIR)
 
     w, h = APP_BACKGROUND_SIZE
     write_imageset("app_background", app_background(w, h, random.Random("app-background")).px, APP_OUTPUT_DIR)
     write_imageset("hunter", hunter().px, APP_OUTPUT_DIR)
+    write_app_icon()
 
     print(f"Pixel art written to {WIDGET_OUTPUT_DIR} and {APP_OUTPUT_DIR}")
 
