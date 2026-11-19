@@ -357,6 +357,10 @@ struct DoveHuntWidgetEntryView: View {
             .buttonStyle(.plain)
             .accessibilityLabel("Fire shotgun")
 
+            if entry.configuration.consoleColor == .nes {
+                NESDecorations()
+            }
+
             screen
                 .padding(contentMargins)
         }
@@ -559,7 +563,7 @@ struct DoveHuntWidget: Widget {
 }
 
 extension ConfigurationAppIntent {
-    fileprivate static func with(_ landscape: Landscape, color: ConsoleColor = .classicBlue) -> ConfigurationAppIntent {
+    fileprivate static func with(_ landscape: Landscape, color: ConsoleColor = .nes) -> ConfigurationAppIntent {
         let intent = ConfigurationAppIntent()
         intent.landscape = landscape
         intent.consoleColor = color

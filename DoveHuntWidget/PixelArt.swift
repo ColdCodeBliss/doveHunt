@@ -39,7 +39,8 @@ extension ConsoleColor {
 
 /// The original NES colorway: light grey lid on top, dark grey front below, and the black
 /// strip on the right that runs down both halves. The screen covers the middle, so the
-/// strip shows in the border above and below it.
+/// strip shows in the border above and below it. The lettering and buttons are drawn by
+/// `NESDecorations` in the widget content, which knows the exact border sizes.
 struct NESShell: View {
     static let lidGrey = Color(red: 0.8, green: 0.8, blue: 0.79)
     static let frontGrey = Color(red: 0.47, green: 0.47, blue: 0.49)
@@ -48,7 +49,6 @@ struct NESShell: View {
 
     var body: some View {
         GeometryReader { proxy in
-            let size = proxy.size
             ZStack(alignment: .topLeading) {
                 VStack(spacing: 0) {
                     Self.lidGrey
@@ -56,10 +56,86 @@ struct NESShell: View {
                     Self.frontGrey
                 }
                 Self.strip
-                    .frame(width: size.width * 0.08)
-                    .offset(x: size.width * 0.8)
+                    .frame(width: proxy.size.width * 0.12)
+                    .offset(x: proxy.size.width * 0.76)
             }
         }
+    }
+}
+
+/// NES console details in the border: the red "ENTERTAINMENT SYSTEM" lettering on the lid
+/// (top left, inset from the corner) and the POWER and RESET buttons on the front (bottom left).
+/// Purely decorative, so it never takes taps away from the shotgun.
+struct NESDecorations: View {
+    static let logoRed = Color(red: 0.78, green: 0.1, blue: 0.14)
+    static let keyGrey = Color(red: 0.6, green: 0.6, blue: 0.62)
+    static let keyHighlight = Color(red: 0.74, green: 0.74, blue: 0.76)
+    static let slotDark = Color(red: 0.2, green: 0.2, blue: 0.22)
+    static let powerLight = Color(red: 0.86, green: 0.12, blue: 0.12)
+    /// The dark red used for the POWER and RESET labels on the real console.
+    static let labelRed = Color(red: 0.45, green: 0.06, blue: 0.08)
+
+    @Environment(\.widgetContentMargins) private var margins
+
+    var body: some View {
+        let topBand = max(margins.top, 12)
+        let bottomBand = max(margins.bottom, 12)
+        let inset = max(margins.leading, 12) + 8
+
+        GeometryReader { proxy in
+        // The lettering stays clear of the black strip (which starts at 76% of the width).
+        let lidSpace = proxy.size.width * 0.76 - inset - 6
+
+        VStack(alignment: .leading, spacing: 0) {
+            // Wide, slanted capitals like the NES lid logo; shrinks to fit on the small widget.
+            Text("ENTERTAINMENT SYSTEM")
+                .font(.system(size: min(topBand * 0.4, 7.5), weight: .heavy).width(.expanded).italic())
+                .tracking(0.5)
+                .foregroundStyle(Self.logoRed)
+                .lineLimit(1)
+                .minimumScaleFactor(0.4)
+                .frame(maxWidth: lidSpace, alignment: .leading)
+                .transformEffect(CGAffineTransform(a: 1, b: 0, c: -0.18, d: 1, tx: 0, ty: 0))
+                .frame(height: topBand)
+                .padding(.leading, inset)
+
+            Spacer(minLength: 0)
+
+            HStack(spacing: 5) {
+                // The little square power light, lit red.
+                Rectangle()
+                    .fill(Self.powerLight)
+                    .frame(width: 3, height: 3)
+                    .overlay(Rectangle().stroke(Self.slotDark, lineWidth: 0.5))
+                consoleButton("POWER", bandHeight: bottomBand)
+                consoleButton("RESET", bandHeight: bottomBand)
+            }
+            .frame(height: bottomBand)
+            .padding(.leading, inset - 2)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        }
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+
+    /// A wide grey key set into a dark recessed slot, with a light bevel along its top edge
+    /// and a small dark red label, like the NES front panel.
+    private func consoleButton(_ label: String, bandHeight: CGFloat) -> some View {
+        let height = min(bandHeight * 0.6, 10.5)
+        return Text(label)
+            .font(.system(size: height * 0.46, weight: .heavy).width(.expanded))
+            .foregroundStyle(Self.labelRed)
+            .lineLimit(1)
+            .fixedSize()
+            .padding(.horizontal, 4)
+            .frame(minWidth: height * 3.2, minHeight: height)
+            .background(
+                Self.keyGrey
+                    .overlay(alignment: .top) { Self.keyHighlight.frame(height: 1) }
+            )
+            .padding(1.25)
+            .background(Self.slotDark)
     }
 }
 

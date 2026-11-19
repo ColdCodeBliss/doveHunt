@@ -134,6 +134,17 @@ The flash window is measured from the moment of the shot (`flashDuration`, 0.5 s
 - **Flash length:** the muzzle flash stays on screen until the next redraw, so about 1–2 s in practice. This is a host limit, not a code setting.
 - **Glide animation:** doves are drawn in a **non-interactive sprite layer** that glides with `.linear(duration: frameInterval)`. A separate layer of invisible **tap targets** sits underneath, each spanning the dove's previous → current frame positions, so shots land mid-glide. This separation is needed because interactive buttons don't animate their position. On the simulator the Home Screen logs `Ignored view update … (foreground: false)` and only shows snapshots about every 1.8–2 s, so the glide can't be seen there. **Verify on a physical device.**
 
+### Console color (`ConsoleColor`)
+
+- **Where to change it:** touch and hold the widget → **Edit Widget** → **Console Color**. It's stored on `ConfigurationAppIntent.consoleColor` and defaults to **NES**, which is listed first.
+- **Solid colors:** Classic Blue, Cherry Red, Lime Green, Grape Purple, Sunny Yellow, Bubblegum Pink, Tangerine, Teal Wave, Charcoal, and Arctic White. These are drawn as the widget's `containerBackground`.
+- **NES:** the original console colorway.
+  - **Background (`NESShell`):** light grey lid on top, dark grey front below with a seam between them, and a wide black strip on the right that shows above and below the screen.
+  - **Details (`NESDecorations`):** drawn in the widget content so they line up with the real border sizes, and set to ignore taps.
+  - **Lid lettering:** red, slanted "ENTERTAINMENT SYSTEM" in an expanded italic system font with an extra shear, inset from the top-left corner. It shrinks to fit the small widget.
+  - **Front panel:** a red power light, then POWER and RESET keys set into dark recessed slots, with dark red labels.
+- **Tinted Home Screen:** the system replaces widget backgrounds with its own tint, so the chosen color doesn't show in that mode.
+
 ### No accidental app launches (`MissShotIntent`)
 
 - A transparent full-widget `Button(intent: MissShotIntent())` sits behind the screen, so any tap that misses a dove (sky, ground, or the blue console shell) fires the shotgun instead of opening the app.
@@ -258,3 +269,6 @@ python3 -I Tools/generate_pixel_art.py
 - **2026-11-18** Added the aiming shotgun: sheared left and right sprites, aim by angle with an 18° front tolerance, and a 3×2 miss grid so misses aim too. Buttons now carry their drawn frame, so the poof is pixel-exact. Fixed slow reloads (a 36-cell grid × 61 entries took 2–4.6 s; now about 0.1–0.3 s) with a coarse grid and short post-shot timelines. Matched flight frames to the measured Home Screen redraw rate (1.5 s). Verified on the simulator.
 - **2026-11-18** Moved the shot intents to `Shared/` (both targets) with `supportedModes = .background` so taps never open the app. Split doves into a gliding sprite layer and a stationary tap-target layer that covers each frame's path; hits on moving doves were verified. Rapid taps were verified not to open the app on the simulator. The glide still appears as steps on the simulator because of the Home Screen's snapshot cadence; it needs a device check.
 - **2026-11-18** Fixed doves freezing while the player shoots: reloads now continue the flight frame schedule instead of restarting it. Verified on the simulator: 20 taps over 10 s and the doves kept moving at the normal ~1.5 s cadence throughout, hits still landed, and the app never opened.
+
+- **2026-11-19** Added the **Console Color** widget setting (10 solid colors) and an **NES** colorway with lid lettering, POWER and RESET keys, a power light, and the black strip.
+- **2026-11-19** Made **NES** the default console color, listed first in the picker. Classic Blue is still available.

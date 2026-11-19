@@ -52,6 +52,7 @@ enum Difficulty: String, AppEnum {
 
 /// The color of the handheld console shell around the screen.
 enum ConsoleColor: String, AppEnum {
+    case nes
     case classicBlue
     case cherryRed
     case limeGreen
@@ -62,12 +63,12 @@ enum ConsoleColor: String, AppEnum {
     case tealWave
     case charcoal
     case arcticWhite
-    case nes
 
     static var typeDisplayRepresentation: TypeDisplayRepresentation { "Console Color" }
 
     static var caseDisplayRepresentations: [ConsoleColor: DisplayRepresentation] {
         [
+            .nes: "NES",
             .classicBlue: "Classic Blue",
             .cherryRed: "Cherry Red",
             .limeGreen: "Lime Green",
@@ -77,8 +78,7 @@ enum ConsoleColor: String, AppEnum {
             .tangerine: "Tangerine",
             .tealWave: "Teal Wave",
             .charcoal: "Charcoal",
-            .arcticWhite: "Arctic White",
-            .nes: "NES"
+            .arcticWhite: "Arctic White"
         ]
     }
 }
@@ -95,6 +95,6 @@ struct ConfigurationAppIntent: WidgetConfigurationIntent {
     @Parameter(title: "Difficulty", default: .normal)
     var difficulty: Difficulty
 
-    @Parameter(title: "Console Color", default: .classicBlue)
+    @Parameter(title: "Console Color", default: .nes)
     var consoleColor: ConsoleColor
 }
