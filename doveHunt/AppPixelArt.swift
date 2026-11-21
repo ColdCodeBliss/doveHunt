@@ -42,6 +42,35 @@ enum AppArt {
     }
     static let hunter = CGSize(width: 38, height: 48)
     static let dove = CGSize(width: 16, height: 14)
+
+    // Adventure sprites (see the "Adventure props" section of the generator).
+    static let poof = CGSize(width: 16, height: 14)
+    static let muzzleFlash = CGSize(width: 9, height: 5)
+    static let tree = CGSize(width: 34, height: 46)
+    static let bush = CGSize(width: 22, height: 11)
+    static let cabin = CGSize(width: 70, height: 80)
+    /// Horizontal center of the cabin's doorway, in cabin-sprite pixels (`CABIN_DOOR`).
+    static let cabinDoorCenterX: CGFloat = 22
+    /// Horizontal center of the hunter's body, in hunter-sprite pixels.
+    static let hunterBodyCenterX: CGFloat = 13
+    /// Where the muzzle flash sits relative to the hunter sprite's top-left corner (barrel tip).
+    static let hunterMuzzle = CGPoint(x: 38, y: 6)
+    /// Walk cycle frames, played at `Adventure.walkFrameRate`.
+    static let hunterWalkCycle = ["hunter_walk_a", "hunter", "hunter_walk_b", "hunter"]
+    /// Top-center of the cabin's chimney, in cabin-sprite pixels (where the chimney dove perches).
+    static let cabinChimneyTop = CGPoint(x: 52, y: 2)
+
+    // Cabin interior (see the "Cabin interior" section of the generator).
+    static let interior = CGSize(width: 240, height: 130)
+    /// Characters' feet line inside the cabin (`INTERIOR_FEET`).
+    static let interiorFeet: CGFloat = 118
+    /// The TV's screen, drawn live over the room art (`INTERIOR_TV_SCREEN`).
+    static let interiorTVScreen = CGRect(x: 32, y: 69, width: 16, height: 16)
+    /// Center of the kitchen's back door (`INTERIOR_BACK_DOOR`).
+    static let interiorBackDoorCenterX: CGFloat = 224
+    static let anna = CGSize(width: 26, height: 48)
+    static let annaBodyCenterX: CGFloat = 12
+    static let annaWalkCycle = ["anna_walk_a", "anna", "anna_walk_b", "anna"]
 }
 
 /// An asset-catalog sprite scaled with nearest-neighbor sampling so pixels stay crisp.
@@ -188,7 +217,7 @@ struct PixelPanel: ViewModifier {
         content
             .padding(16)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(fill)
+            .background(fill, ignoresSafeAreaEdges: [])
             .overlay(Rectangle().strokeBorder(Color.pixelCream, lineWidth: 3))
             .background(Rectangle().fill(Color.pixelInk).offset(x: 4, y: 4))
     }
@@ -209,7 +238,7 @@ struct PixelButtonStyle: ButtonStyle {
             .padding(.vertical, 12)
             .padding(.horizontal, 16)
             .frame(maxWidth: .infinity)
-            .background(fill)
+            .background(fill, ignoresSafeAreaEdges: [])
             .overlay(Rectangle().strokeBorder(Color.pixelCream, lineWidth: 3))
             .offset(x: configuration.isPressed ? 3 : 0, y: configuration.isPressed ? 3 : 0)
             .background(Rectangle().fill(Color.pixelInk).offset(x: 3, y: 3))

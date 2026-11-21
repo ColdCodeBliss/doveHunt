@@ -29,17 +29,37 @@ enum MenuDestination: String, Identifiable, CaseIterable {
 struct ContentView: View {
     @Environment(HuntRecords.self) private var records
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @State private var isMenuOpen = false
     @State private var destination: MenuDestination?
+    /// The side-scrolling adventure that starts right here on the home screen.
+    @State private var game = AdventureGame()
 
     var body: some View {
         ZStack(alignment: .topLeading) {
-            HuntingScene()
+            AdventureView(game: game)
                 .ignoresSafeArea()
 
-            header
-                .frame(maxWidth: .infinity)
-                .padding(.top, 72)
+            if game.showsTitle {
+                header
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, 72)
+                    .allowsHitTesting(false)
+                    .transition(.opacity)
+            } else if !game.isFinished {
+                // The Hunter's Quest HUD: this run's score and doves, separate from the widget's.
+                PixelText("SCORE \(String(format: "%06d", min(game.score, 999_999)))  BAGGED \(game.bagged)", pixelSize: horizontalSizeClass == .regular ? 3 : 2)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(Color.pixelInk.opacity(0.55), ignoresSafeAreaEdges: [])
+                    .frame(maxWidth: .infinity)
+                    // Keep clear of the menu button on the left.
+                    .padding(.leading, 72)
+                    .padding(.trailing, 16)
+                    .padding(.top, 18)
+                    .allowsHitTesting(false)
+                    .transition(.opacity)
+            }
 
             menuButton
                 .padding(.leading, 16)
@@ -69,20 +89,25 @@ struct ContentView: View {
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { records.refresh() }
         }
+        .animation(.easeInOut(duration: 0.6), value: game.showsTitle)
+        .onChange(of: game.phase) { _, phase in
+            if case .finished = phase { records.refresh() }
+        }
     }
 
+    /// The Hunter's Quest title screen. Its score is the quest's own, separate from the widget game.
     private var header: some View {
         VStack(spacing: 14) {
             PixelText("DOVE HUNT", pixelSize: 6, scalesWithDynamicType: false)
 
-            PixelText("SCORE \(String(format: "%06d", min(records.score, 999_999)))", pixelSize: 3)
+            PixelText("THE HUNTER'S QUEST", pixelSize: 3, color: .pixelOrange)
+
+            PixelText("BEST \(String(format: "%06d", min(records.questBestScore, 999_999)))", pixelSize: 3)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
-                .background(Color.pixelInk.opacity(0.55))
+                .background(Color.pixelInk.opacity(0.55), ignoresSafeAreaEdges: [])
 
-            if records.score == 0 {
-                PixelText("ADD THE WIDGET TO HUNT!", pixelSize: 2)
-            }
+            PixelText("SHOOT THE DOVES TO BEGIN!", pixelSize: 2)
         }
     }
 
@@ -98,7 +123,7 @@ struct ContentView: View {
                 }
             }
             .frame(width: 48, height: 48)
-            .background(Color.pixelNavy)
+            .background(Color.pixelNavy, ignoresSafeAreaEdges: [])
             .overlay(Rectangle().strokeBorder(Color.pixelCream, lineWidth: 3))
             .background(Rectangle().fill(Color.pixelInk).offset(x: 3, y: 3))
         }
@@ -113,87 +138,6 @@ struct ContentView: View {
     }
 }
 
-// MARK: - Hunting scene
-
-/// The pixel backdrop: blue sky, the hunter on the grass, and doves bobbing ahead of his aim.
-struct HuntingScene: View {
-    @AppStorage(AppSettings.animatedDovesKey) private var animatedDoves = true
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    /// Where the doves float ahead of the hunter: a fraction of the visible width, and a height
-    /// above the grass in art pixels. Relative placement keeps them in view on any screen shape.
-    private let doves: [(fractionX: CGFloat, aboveGround: CGFloat, phase: Double, facesRight: Bool)] = [
-        (0.66, 50, 0.0, true),
-        (0.84, 72, 1.7, true),
-        (0.58, 90, 3.1, false),
-    ]
-
-    /// Approximate height of the title, score, and hint at the top of the screen, in points.
-    private let headerHeight: CGFloat = 230
-
-    var body: some View {
-        GeometryReader { proxy in
-            let screen = proxy.size
-            let art = AppArt.background(for: screen)
-            // One art pixel in points. The art fills the screen; any overflow is cropped from
-            // the sides and from the TOP (the bottom is anchored), so the grass and the hunter
-            // are always on screen, whatever the device or orientation.
-            let scale = max(screen.width / art.size.width, screen.height / art.size.height)
-            let origin = CGPoint(
-                x: (screen.width - art.size.width * scale) / 2,
-                y: screen.height - art.size.height * scale
-            )
-            let point = { (x: CGFloat, y: CGFloat) in
-                CGPoint(x: origin.x + x * scale, y: origin.y + y * scale)
-            }
-            // The part of the art that is actually visible, in art pixels.
-            let visibleMinX = -origin.x / scale
-            let visibleWidth = screen.width / scale
-            let visibleMinY = -origin.y / scale
-            let isAnimating = animatedDoves && !reduceMotion
-
-            ZStack {
-                AppSprite(name: art.name, size: art.size, scale: scale)
-                    .position(point(art.size.width / 2, art.size.height / 2))
-
-                // The hunter stands at the left edge of whatever is visible.
-                AppSprite(name: "hunter", size: AppArt.hunter, scale: scale)
-                    .position(point(
-                        (visibleMinX + 4 + AppArt.hunter.width / 2).rounded(),
-                        AppArt.groundTop + 3 - AppArt.hunter.height / 2
-                    ))
-
-                TimelineView(.animation(minimumInterval: 1.0 / 12.0, paused: !isAnimating)) { context in
-                    let time = isAnimating ? context.date.timeIntervalSinceReferenceDate : 0
-
-                    ZStack {
-                        ForEach(doves.indices, id: \.self) { index in
-                            let dove = doves[index]
-                            let restX = (visibleMinX + visibleWidth * dove.fractionX).rounded()
-                            // Keep doves below the title/score header on short, wide screens.
-                            let belowHeader = visibleMinY + headerHeight / scale + AppArt.dove.height
-                            let restY = min(
-                                max(AppArt.groundTop - dove.aboveGround, belowHeader),
-                                AppArt.groundTop - AppArt.dove.height
-                            ).rounded()
-                            // Offsets snap to whole art pixels to keep the retro motion.
-                            let dx = (sin(time * 0.7 + dove.phase) * 3).rounded()
-                            let dy = (sin(time * 1.6 + dove.phase) * 2).rounded()
-                            let wingsUp = Int(time * 4 + dove.phase).isMultiple(of: 2)
-
-                            AppSprite(name: wingsUp ? "dove_wings_up" : "dove_wings_down", size: AppArt.dove, scale: scale)
-                                .scaleEffect(x: dove.facesRight ? 1 : -1)
-                                .position(point(restX + dx, restY + dy))
-                        }
-                    }
-                }
-            }
-        }
-        .accessibilityElement()
-        .accessibilityLabel("A hunter in an orange cap aims his shotgun at doves flying across a blue sky")
-    }
-}
-
 // MARK: - Menu drawer
 
 struct MenuDrawer: View {
@@ -205,7 +149,9 @@ struct MenuDrawer: View {
             HStack {
                 PixelText("MENU", pixelSize: 4, color: .pixelOrange)
                 Spacer()
-                Button(action: onClose) {
+                Button {
+                    onClose()
+                } label: {
                     PixelText("X", pixelSize: 3)
                         .frame(width: 44, height: 44)
                 }

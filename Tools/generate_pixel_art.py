@@ -597,9 +597,13 @@ def app_background(w, h, rng):
         circles = [(cx, cy, size), (cx - size * 1.2, cy + 1.5, size * 0.75), (cx + size * 1.3, cy + 1.2, size * 0.8)]
         shade_blob(c, circles, None, hex_color("#BFDDF2"), hex_color("#F4FAFF"), hex_color("#FFFFFF"))
 
+    # Hills use whole numbers of waves across the width, so the art tiles seamlessly into one
+    # continuous panorama for the side-scrolling adventure.
     phase = rng.uniform(0, 6.28)
+    k1, k2 = max(1, round(w / 80)), max(2, round(w / 30))
     for x in range(w):
-        top = gy - 5 - 3 * (0.6 * math.sin(x * 0.08 + phase) + 0.4 * math.sin(x * 0.21 + phase * 2))
+        t = 2 * math.pi * x / w
+        top = gy - 5 - 3 * (0.6 * math.sin(k1 * t + phase) + 0.4 * math.sin(k2 * t + phase * 2))
         for y in range(int(top), gy):
             c.set(x, y, hex_color("#7FC46C"))
 
@@ -638,8 +642,13 @@ def outlined(canvas, outline):
     return out
 
 
-def hunter():
-    """Vintage hunter in a blaze-orange cap and red plaid jacket, shotgun angled at the sky."""
+def hunter(pose="stand"):
+    """Vintage hunter in a blaze-orange cap and red plaid jacket, shotgun angled at the sky.
+
+    `pose` is "stand", or a walk-cycle stride: "a" (legs apart) or "b" (legs passing).
+    Only the lower legs and boots move, so the frames line up perfectly.
+    """
+    back_dx, front_dx = {"stand": (0, 0), "a": (-2, 2), "b": (1, -1)}[pose]
     c = Canvas(38, 48)
     ox, oy = 2, 1
 
@@ -664,17 +673,18 @@ def hunter():
             return plaid_dark
         return plaid
 
-    # Boots (toes point right, the way he faces).
-    for x0 in (6, 12):
+    # Boots (toes point right, the way he faces); they follow the lower legs.
+    for x0, dx in ((6, back_dx), (12, front_dx)):
         for y in range(41, 45):
-            for x in range(x0, x0 + 5 + (1 if y >= 43 else 0)):
+            for x in range(x0 + dx, x0 + dx + 5 + (1 if y >= 43 else 0)):
                 put(x, y, boot_dark if y == 44 else boot)
 
-    # Legs with a gap between them.
-    for x0 in (7, 12):
+    # Legs: thighs stay put, shins swing for the walk cycle.
+    for x0, dx in ((7, back_dx), (12, front_dx)):
         for y in range(30, 41):
-            for x in range(x0, x0 + 4):
-                put(x, y, pants_shade if x == x0 + 3 else pants)
+            shift = dx if y >= 35 else (dx // 2 if y >= 33 else 0)
+            for x in range(x0 + shift, x0 + shift + 4):
+                put(x, y, pants_shade if x == x0 + shift + 3 else pants)
 
     # Plaid jacket with rounded shoulders and a belt.
     for y in range(15, 31):
@@ -762,6 +772,363 @@ def hunter():
         put(hx + 1, hy + 1, skin)
 
     return outlined(c, hex_color("#26263A"))
+
+
+# MARK: - Adventure props (companion app side-scroller)
+
+def prop_tree():
+    """A leafy tree like the meadow's, on a transparent canvas; trunk base at the bottom row."""
+    c = Canvas(34, 46)
+    tx, base = 17, 45
+    for y in range(26, base + 1):
+        for x in range(tx - 2, tx + 3):
+            if x in (tx - 2, tx + 2):
+                c.set(x, y, hex_color("#3A2212"))
+            elif x == tx - 1:
+                c.set(x, y, hex_color("#8A5A34"))
+            elif x == tx + 1:
+                c.set(x, y, hex_color("#4A2C18"))
+            else:
+                c.set(x, y, hex_color("#6B4226"))
+    r = 11
+    circles = [(tx, 14, r), (tx - 9, 19, r * 0.7), (tx + 9, 18, r * 0.72), (tx + 2, 7, r * 0.62)]
+    shade_blob(c, circles, hex_color("#1F4F22"), hex_color("#2E7D32"), hex_color("#43A047"), hex_color("#7CC85E"))
+    return c
+
+
+def prop_bush():
+    c = Canvas(22, 11)
+    shade_blob(c, [(8, 6, 5), (14, 6.5, 4.5), (4, 8, 3.2), (18, 8, 3.2)],
+               hex_color("#1F4F22"), hex_color("#2E7D32"), hex_color("#43A047"), hex_color("#7CC85E"))
+    return c
+
+
+CABIN_SIZE = (70, 80)          # keep in sync with AppArt.cabin
+CABIN_DOOR = (13, 30, 31, 80)  # x0, y0, x1, y1 of the doorway (y1 = ground)
+
+
+def cabin(door_open):
+    """Brown log cabin with a shingled roof, stone chimney, lit window, and a door."""
+    w, h = CABIN_SIZE
+    c = Canvas(w, h)
+    log, log_light, log_dark, log_end = (hex_color("#7A4B2A"), hex_color("#9A6A3F"),
+                                         hex_color("#4F2F17"), hex_color("#B07F4E"))
+    roof, roof_dark, roof_light = hex_color("#5A2E22"), hex_color("#3E1F17"), hex_color("#7A4030")
+    stone, stone_dark, mortar = hex_color("#8C8C94"), hex_color("#5E5E66"), hex_color("#B4B4BA")
+
+    # Chimney (behind the roof).
+    for y in range(2, 20):
+        for x in range(48, 56):
+            c.set(x, y, mortar if (y % 4 == 0 or (x + (y // 4) * 3) % 5 == 0) else (stone if (x + y) % 3 else stone_dark))
+
+    # Log walls: 5-pixel logs with a highlight on top and shadow underneath, round log ends.
+    wall_top = 24
+    for y in range(wall_top, h):
+        row = (y - wall_top) % 5
+        for x in range(5, w - 5):
+            c.set(x, y, log_light if row == 0 else (log_dark if row == 4 else log))
+        for x in (3, 4, w - 5, w - 4):
+            c.set(x, y, log_end if row in (1, 2, 3) else log_dark)
+
+    # Shingled roof with an overhang.
+    apex = w // 2
+    for y in range(4, wall_top + 2):
+        half = int((y - 4) * 1.6) + 3
+        for x in range(apex - half, apex + half + 1):
+            shingle = (y % 3 == 0) or ((x + (y // 3) * 2) % 6 == 0)
+            c.set(x, y, roof_dark if shingle else (roof_light if x < apex - half + 3 else roof))
+
+    # Window with a warm glow and a cross frame.
+    wx0, wy0, wx1, wy1 = 42, 36, 58, 52
+    for y in range(wy0, wy1):
+        for x in range(wx0, wx1):
+            edge = x in (wx0, wx1 - 1) or y in (wy0, wy1 - 1)
+            cross = x == (wx0 + wx1) // 2 or y == (wy0 + wy1) // 2
+            if edge or cross:
+                c.set(x, y, hex_color("#3A2212"))
+            else:
+                c.set(x, y, hex_color("#FFF0A8") if (x - wx0) < 4 and (y - wy0) < 5 else hex_color("#F4C94E"))
+
+    # Door: plank door when closed, dark interior with the door swung inward when open.
+    dx0, dy0, dx1, dy1 = CABIN_DOOR
+    for y in range(dy0, dy1):
+        for x in range(dx0, dx1):
+            frame = x in (dx0, dx1 - 1) or y == dy0
+            if frame:
+                c.set(x, y, hex_color("#3A2212"))
+            elif door_open:
+                c.set(x, y, hex_color("#B08850") if x <= dx0 + 2 else hex_color("#160D08"))
+            else:
+                c.set(x, y, hex_color("#5A3519") if (x - dx0) % 4 == 0 else hex_color("#7E5230"))
+    if not door_open:
+        c.set(dx1 - 4, (dy0 + dy1) // 2, hex_color("#E8C547"))
+        c.set(dx1 - 4, (dy0 + dy1) // 2 + 1, hex_color("#B8952F"))
+
+    return outlined(c, hex_color("#26263A"))
+
+
+# MARK: - Cabin interior (companion app cut-scene)
+
+INTERIOR_SIZE = (240, 130)     # keep in sync with AppArt.interior
+INTERIOR_FEET = 118            # characters' feet line (AppArt.interiorFeet)
+INTERIOR_TV_SCREEN = (32, 69, 48, 85)    # x0, y0, x1, y1 (AppArt.interiorTVScreen)
+INTERIOR_BACK_DOOR = (214, 50, 234, 113)  # x0, y0, x1, y1 (AppArt.interiorBackDoor)
+
+
+def cabin_interior(back_door_open):
+    """The cabin's living room and kitchen: plank walls, floorboards, TV, couch, table and
+    chairs, fridge, kitchen island, and the kitchen's back door."""
+    w, h = INTERIOR_SIZE
+    c = Canvas(w, h)
+    rng = random.Random("cabin-interior")
+    H = hex_color
+
+    # Plank walls with seams and a little grain.
+    for y in range(0, 108):
+        for x in range(w):
+            plank = x // 7
+            base = (H("#8A5A34"), H("#7E522F"), H("#94623A"))[plank % 3]
+            if x % 7 == 0:
+                base = H("#5A3519")
+            elif (x * 7 + y * 3 + plank * 11) % 23 == 0:
+                base = H("#6E4626")
+            c.set(x, y, base)
+    c.rect(0, 0, w, 6, H("#4A2C18"))                      # ceiling beam
+    c.rect(0, 6, w, 7, H("#3A2212"))
+    c.rect(0, 108, w, 113, H("#4A2C18"))                  # baseboard
+    c.rect(0, 108, w, 109, H("#6B4226"))
+    # Floorboards.
+    for y in range(113, h):
+        for x in range(w):
+            row = (y - 113) // 4
+            seam = (y - 113) % 4 == 3 or (x + row * 17) % 31 == 0
+            c.set(x, y, H("#6E4826") if seam else (H("#A87848") if row % 2 == 0 else H("#9A6C40")))
+
+    def frame_rect(x0, y0, x1, y1, color):
+        for x in range(x0, x1):
+            c.set(x, y0, color)
+            c.set(x, y1 - 1, color)
+        for y in range(y0, y1):
+            c.set(x0, y, color)
+            c.set(x1 - 1, y, color)
+
+    # Front doorway on the left, open to the sunny meadow outside.
+    for y in range(50, 113):
+        t = (y - 50) / 63
+        for x in range(3, 20):
+            if y > 100:
+                c.set(x, y, H("#4C9F3C") if (x + y) % 5 else H("#66B852"))
+            else:
+                c.set(x, y, H("#A6D8F8") if t < 0.55 else H("#74B4EC") if t < 0.75 else H("#7FC46C"))
+    frame_rect(2, 49, 21, 114, H("#3A2212"))
+    c.rect(21, 50, 24, 113, H("#7E5230"))                 # the door, swung open against the wall
+    c.rect(23, 50, 24, 113, H("#5A3519"))
+
+    # Framed painting (a tiny meadow).
+    for y in range(41, 57):
+        for x in range(73, 95):
+            c.set(x, y, H("#74B4EC") if y < 50 else H("#5DB04A"))
+    c.rect(86, 44, 90, 47, H("#FFFFFF"))
+    frame_rect(72, 40, 96, 58, H("#C9A24A"))
+    frame_rect(71, 39, 97, 59, H("#8A6A2A"))
+
+    # Window with gingham curtains.
+    for y in range(29, 52):
+        for x in range(113, 137):
+            c.set(x, y, H("#A6D8F8") if y < 44 else H("#7FC46C"))
+    frame_rect(112, 28, 137, 53, H("#3A2212"))
+    c.rect(124, 28, 125, 53, H("#3A2212"))
+    c.rect(112, 40, 137, 41, H("#3A2212"))
+    for x0 in (108, 134):
+        for y in range(26, 58):
+            for x in range(x0, x0 + 6):
+                check = ((x // 2) + (y // 2)) % 2
+                c.set(x, y, H("#C8382E") if check else H("#F2E6E0"))
+    c.rect(106, 25, 145, 27, H("#5A3519"))                # curtain rod
+
+    # Old box TV with rabbit ears on a wooden stand.
+    c.rect(28, 90, 59, 113, H("#5A3519"))
+    c.rect(29, 91, 58, 112, H("#6B4226"))
+    c.rect(29, 100, 58, 101, H("#4A2C18"))
+    c.rect(42, 95, 46, 96, H("#C9A24A"))
+    c.rect(42, 105, 46, 106, H("#C9A24A"))
+    c.rect(30, 66, 57, 90, H("#6E4A2C"))                  # wood-grain cabinet
+    for y in range(66, 90, 3):
+        c.rect(30, y, 57, y + 1, H("#5E3E24"))
+    sx0, sy0, sx1, sy1 = INTERIOR_TV_SCREEN
+    c.rect(sx0 - 2, sy0 - 2, sx1 + 2, sy1 + 2, H("#3A3A40"))   # bezel
+    c.rect(sx0, sy0, sx1, sy1, H("#101018"))
+    for ky in (70, 76):
+        c.rect(51, ky, 55, ky + 3, H("#C0C0C8"))
+        c.set(52, ky + 1, H("#7C7C86"))
+    for gy in range(82, 88, 2):
+        c.rect(50, gy, 56, gy + 1, H("#3A2A1C"))
+    for (tx, ty) in ((35, 52), (51, 53)):
+        steps = 24
+        for i in range(steps + 1):
+            t = i / steps
+            c.set(round(43 + (tx - 43) * t), round(66 + (ty - 66) * t), H("#2A2A30"))
+        c.set(tx, ty, H("#C0C0C8"))
+    c.rect(41, 64, 46, 66, H("#2A2A30"))
+
+    # Couch.
+    red, red_dark, red_light = H("#8E3B2E"), H("#6A2A20"), H("#B0543F")
+    for y in range(82, 97):
+        for x in range(66, 106):
+            c.set(x, y, red_light if y < 85 else red)
+    c.rect(64, 88, 71, 109, red_dark)                     # arms
+    c.rect(101, 88, 108, 109, red_dark)
+    c.rect(64, 88, 71, 90, red_light)
+    c.rect(101, 88, 108, 90, red_light)
+    c.rect(71, 96, 101, 104, red_light)                   # seat cushions
+    c.rect(86, 96, 87, 104, red_dark)
+    c.rect(66, 104, 106, 110, red)
+    c.rect(66, 109, 106, 110, red_dark)
+    for fx in (67, 104):
+        c.rect(fx, 110, fx + 2, 113, H("#3A2212"))
+
+    # Small wooden table and two chairs.
+    wood, wood_dark, wood_light = H("#8B5A2B"), H("#5E3A1A"), H("#B98049")
+    c.rect(126, 92, 151, 94, wood_light)
+    c.rect(126, 94, 151, 96, wood_dark)
+    for lx in (128, 148):
+        c.rect(lx, 96, lx + 2, 113, wood)
+    for cx0, back_left in ((114, True), (153, False)):
+        post = cx0 if back_left else cx0 + 8
+        c.rect(post, 78, post + 2, 113, wood_dark)        # back post / back leg
+        for sy in (81, 85):
+            c.rect(min(post, cx0 + 1), sy, max(post + 2, cx0 + 9), sy + 2, wood)
+        c.rect(cx0, 99, cx0 + 10, 102, wood_light)        # seat
+        front = cx0 + 8 if back_left else cx0
+        c.rect(front, 102, front + 2, 113, wood_dark)     # front leg
+
+    # Small white fridge.
+    white, white_shade, edge = H("#F2F2EE"), H("#CFCFCA"), H("#8C8C94")
+    c.rect(164, 66, 182, 113, white)
+    c.rect(180, 67, 182, 113, white_shade)
+    frame_rect(164, 66, 182, 113, edge)
+    c.rect(165, 81, 181, 82, edge)
+    c.rect(178, 71, 180, 77, H("#5C6475"))
+    c.rect(178, 85, 180, 94, H("#5C6475"))
+    c.rect(165, 66, 166, 67, white)                       # rounded corners
+    c.rect(180, 66, 181, 67, white)
+
+    # Kitchen island with a butcher-block top.
+    c.rect(186, 92, 211, 95, H("#C49A62"))
+    c.rect(186, 94, 211, 95, H("#A87848"))
+    c.rect(187, 95, 210, 113, H("#7E5230"))
+    frame_rect(189, 98, 198, 110, H("#5A3519"))
+    frame_rect(199, 98, 208, 110, H("#5A3519"))
+
+    # Kitchen back door.
+    dx0, dy0, dx1, dy1 = INTERIOR_BACK_DOOR
+    for y in range(dy0, dy1):
+        for x in range(dx0, dx1):
+            if x in (dx0, dx1 - 1) or y == dy0:
+                c.set(x, y, H("#3A2212"))
+            elif back_door_open:
+                c.set(x, y, H("#B08850") if x >= dx1 - 3 else H("#160D08"))
+            else:
+                c.set(x, y, H("#5A3519") if (x - dx0) % 4 == 0 else H("#7E5230"))
+    if not back_door_open:
+        c.set(dx0 + 3, (dy0 + dy1) // 2, H("#E8C547"))
+        c.set(dx0 + 3, (dy0 + dy1) // 2 + 1, H("#B8952F"))
+
+    return c
+
+
+def anna(pose="stand"):
+    """Anna: blue raggedy overalls with patches, a white apron, and a white bonnet. Faces right."""
+    c = Canvas(26, 48)
+    ox, oy = 2, 1
+
+    def put(x, y, color):
+        c.set(ox + x, oy + y, color)
+
+    H = hex_color
+    skin, skin_shade, blush = H("#F2C29B"), H("#D69A72"), H("#F09A9A")
+    bonnet, bonnet_shade = H("#F4F1E8"), H("#CFCABB")
+    hair = H("#6A4426")
+    blue, blue_dark, blue_fray = H("#3F5FA8"), H("#2C4580"), H("#6B86C8")
+    patch, patch_stitch = H("#C79A52"), H("#7A5A2A")
+    apron, apron_shade = H("#FAFAF6"), H("#D8D8D2")
+    boot, boot_dark = H("#5E3A1A"), H("#3A2212")
+    eye = H("#101018")
+    back_dx, front_dx = {"stand": (0, 0), "a": (-2, 2), "b": (1, -1)}[pose]
+
+    # Boots and legs (overall legs end in a frayed hem).
+    for x0, dx in ((5, back_dx), (10, front_dx)):
+        for y in range(41, 45):
+            for x in range(x0 + dx, x0 + dx + 5 + (1 if y >= 43 else 0)):
+                put(x, y, boot_dark if y == 44 else boot)
+        for y in range(31, 41):
+            shift = dx if y >= 35 else (dx // 2 if y >= 33 else 0)
+            for x in range(x0 + shift, x0 + shift + 5):
+                frayed = y == 40 and (x + y) % 2 == 0
+                put(x, y, blue_fray if frayed else (blue_dark if x == x0 + shift + 4 else blue))
+    # Patch on the back leg.
+    for y in range(34, 37):
+        for x in range(6 + back_dx, 9 + back_dx):
+            put(x, y, patch)
+    put(6 + back_dx, 34, patch_stitch)
+    put(8 + back_dx, 36, patch_stitch)
+
+    # Overall body and bib with straps.
+    for y in range(17, 32):
+        x_start, x_end = (6, 15) if y >= 22 else (8, 14)
+        for x in range(x_start, x_end):
+            put(x, y, blue)
+        put(x_start, y, blue_dark)
+    for y in range(15, 18):
+        put(8, y, blue_dark)
+        put(12, y, blue_dark)
+    put(10, 24, patch)
+    put(11, 24, patch)
+    put(10, 25, patch_stitch)
+    # Shirt sleeve and hand at the front.
+    for y in range(15, 18):
+        for x in range(7, 15):
+            if not (x in (8, 12)):
+                put(x, y, apron_shade)
+    for y in range(17, 27):
+        put(13, y, apron)
+        put(14, y, apron_shade)
+    for y in range(27, 29):
+        put(13, y, skin)
+        put(14, y, skin_shade)
+    # Apron on the front, tied at the waist.
+    for y in range(19, 34):
+        for x in range(11, 16):
+            put(x, y, apron if x < 15 else apron_shade)
+    for x in range(5, 11):
+        put(x, 23, apron_shade)
+    put(4, 23, apron)
+    put(4, 24, apron_shade)
+
+    # Head: hair bun at the back, face, eye, blush.
+    for y in range(6, 15):
+        for x in range(8, 16):
+            put(x, y, skin)
+    put(16, 10, skin)
+    put(16, 11, skin_shade)
+    put(13, 9, eye)
+    put(14, 12, blush)
+    for y in range(7, 13):
+        put(7, y, hair)
+        put(8, y, hair)
+    for y in range(8, 12):
+        put(5, y, hair)
+        put(6, y, hair)
+    # Bonnet with a forward brim and ties.
+    for y, (x_start, x_end) in {0: (8, 13), 1: (7, 15), 2: (6, 16), 3: (6, 16), 4: (6, 16), 5: (6, 16), 6: (6, 10)}.items():
+        for x in range(x_start, x_end):
+            put(x, y, bonnet if x > x_start else bonnet_shade)
+    for x in range(12, 19):
+        put(x, 6, bonnet_shade if x >= 17 else bonnet)
+    for y in range(13, 16):
+        put(9, y, bonnet_shade)
+
+    return outlined(c, H("#26263A"))
 
 
 # MARK: - App icon
@@ -896,6 +1263,21 @@ def main():
         art = app_background(w, h, random.Random(f"app-background-{w}"))
         write_imageset(f"app_background_{w}", art.px, APP_OUTPUT_DIR)
     write_imageset("hunter", hunter().px, APP_OUTPUT_DIR)
+    write_imageset("hunter_walk_a", hunter("a").px, APP_OUTPUT_DIR)
+    write_imageset("hunter_walk_b", hunter("b").px, APP_OUTPUT_DIR)
+    write_imageset("feather_poof", sprite(FEATHER_POOF, SPRITE_PALETTE).px, APP_OUTPUT_DIR)
+    flash = Canvas(9, 5)
+    flash.stamp(MUZZLE_FLASH, GUN_PALETTE, 0, 0)
+    write_imageset("muzzle_flash", flash.px, APP_OUTPUT_DIR)
+    write_imageset("prop_tree", prop_tree().px, APP_OUTPUT_DIR)
+    write_imageset("prop_bush", prop_bush().px, APP_OUTPUT_DIR)
+    write_imageset("cabin_closed", cabin(False).px, APP_OUTPUT_DIR)
+    write_imageset("cabin_open", cabin(True).px, APP_OUTPUT_DIR)
+    write_imageset("interior_door_closed", cabin_interior(False).px, APP_OUTPUT_DIR)
+    write_imageset("interior_door_open", cabin_interior(True).px, APP_OUTPUT_DIR)
+    write_imageset("anna", anna().px, APP_OUTPUT_DIR)
+    write_imageset("anna_walk_a", anna("a").px, APP_OUTPUT_DIR)
+    write_imageset("anna_walk_b", anna("b").px, APP_OUTPUT_DIR)
     write_app_icon()
 
     print(f"Pixel art written to {WIDGET_OUTPUT_DIR} and {APP_OUTPUT_DIR}")

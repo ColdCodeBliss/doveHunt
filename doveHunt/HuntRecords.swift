@@ -6,8 +6,9 @@
 import Observation
 import WidgetKit
 
-/// App-side view of the shared game state. The widget writes to `GameStore`
-/// from its own process, so call `refresh()` whenever the app becomes active.
+/// App-side view of both games' records: the widget game (shared `GameStore`, written by the
+/// widget from its own process, so call `refresh()` whenever the app becomes active) and
+/// The Hunter's Quest (`QuestStore`, app-only). The two are kept completely separate.
 @Observable
 final class HuntRecords {
     private(set) var score = 0
@@ -15,6 +16,11 @@ final class HuntRecords {
     private(set) var lifetimeDoves = 0
     private(set) var lifetimeWaves = 0
     private(set) var topScores: [HuntRecord] = []
+
+    // The Hunter's Quest.
+    private(set) var questLifetimeDoves = 0
+    private(set) var questsCompleted = 0
+    private(set) var questBestScore = 0
 
     init() {
         refresh()
@@ -26,6 +32,9 @@ final class HuntRecords {
         lifetimeDoves = GameStore.lifetimeDoves
         lifetimeWaves = GameStore.lifetimeWaves
         topScores = GameStore.topScores
+        questLifetimeDoves = QuestStore.lifetimeDoves
+        questsCompleted = QuestStore.completed
+        questBestScore = QuestStore.bestScore
     }
 
     /// Archives the current hunt to the top scores and resets the widget for a fresh hunt.

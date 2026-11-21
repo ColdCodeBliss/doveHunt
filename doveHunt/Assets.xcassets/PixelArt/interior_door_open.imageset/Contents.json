@@ -1,0 +1,12 @@
+{
+  "images": [
+    {
+      "filename": "interior_door_open.png",
+      "idiom": "universal"
+    }
+  ],
+  "info": {
+    "author": "xcode",
+    "version": 1
+  }
+}

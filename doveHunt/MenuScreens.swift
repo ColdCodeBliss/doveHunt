@@ -10,6 +10,7 @@ import SwiftUI
 /// App-only preferences and info.
 enum AppSettings {
     static let animatedDovesKey = "animatedDoves"
+    static let soundEffectsKey = "soundEffects"
 
     static var versionString: String {
         Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
@@ -69,6 +70,19 @@ struct TopScoresView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 24) {
+            // The Hunter's Quest (companion app game) records.
+            PixelText("THE HUNTER'S QUEST", pixelSize: 3, scalesWithDynamicType: false)
+            VStack(alignment: .leading, spacing: 12) {
+                PixelText("QUEST RECORDS", pixelSize: 3, color: .pixelOrange)
+                statRow("BEST SCORE", value: String(format: "%06d", min(records.questBestScore, 999_999)))
+                statRow("DOVES BAGGED", value: "\(records.questLifetimeDoves)")
+                statRow("CABIN VISITS", value: "\(records.questsCompleted)")
+            }
+            .pixelPanel()
+
+            // The Home Screen widget game records, kept separate from the quest.
+            PixelText("WIDGET HUNT", pixelSize: 3, scalesWithDynamicType: false)
+                .padding(.top, 8)
             VStack(alignment: .leading, spacing: 12) {
                 PixelText("CURRENT HUNT", pixelSize: 3, color: .pixelOrange)
                 statRow("SCORE", value: String(format: "%06d", min(records.score, 999_999)))
@@ -131,6 +145,7 @@ struct HowToPlayView: View {
         ("PICK A LANDSCAPE", "Touch and hold the widget, tap Edit Widget, and choose Sunny Meadow, Night Woods, or Sunset Marsh."),
         ("TAP TO SHOOT", "Tap a dove to fire. Every dove is worth \(GameStore.pointsPerDove) points. Clear the sky to bring in a new flock."),
         ("BANK YOUR HUNT", "When you're ready for a fresh start, go to Settings and tap Start New Hunt. Your score is saved to Top Scores."),
+        ("THE HUNTER'S QUEST", "This app's own adventure starts right on the home screen. Shoot every dove and the hunter walks on to the next scene. Its score and records are separate from the widget's."),
     ]
 
     var body: some View {
@@ -155,17 +170,21 @@ struct HowToPlayView: View {
 struct SettingsView: View {
     @Environment(HuntRecords.self) private var records
     @AppStorage(AppSettings.animatedDovesKey) private var animatedDoves = true
+    @AppStorage(AppSettings.soundEffectsKey) private var soundEffects = true
     @State private var confirmingNewHunt = false
     @State private var confirmingClearScores = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 24) {
             VStack(alignment: .leading, spacing: 12) {
-                PixelText("DISPLAY", pixelSize: 3, color: .pixelOrange)
+                PixelText("DISPLAY & SOUND", pixelSize: 3, color: .pixelOrange)
                 Toggle("Animated doves", isOn: $animatedDoves)
                     .retroBody()
                     .tint(.pixelOrange)
-                Text("Doves on the home screen bob and flap. Reduce Motion turns this off automatically.")
+                Toggle("Sound effects", isOn: $soundEffects)
+                    .retroBody()
+                    .tint(.pixelOrange)
+                Text("Doves on the home screen bob and flap; Reduce Motion turns this off automatically. Sound effects play in The Hunter's Quest and follow your silent switch.")
                     .retroBody()
                     .font(.system(.caption, design: .monospaced))
                     .opacity(0.75)
@@ -173,7 +192,7 @@ struct SettingsView: View {
             .pixelPanel()
 
             VStack(alignment: .leading, spacing: 16) {
-                PixelText("HUNT", pixelSize: 3, color: .pixelOrange)
+                PixelText("WIDGET HUNT", pixelSize: 3, color: .pixelOrange)
 
                 Button {
                     confirmingNewHunt = true
@@ -228,7 +247,7 @@ struct AboutView: View {
 
             VStack(alignment: .leading, spacing: 12) {
                 PixelText("DOVE HUNT", pixelSize: 4, color: .pixelOrange)
-                Text("A retro Home Screen hunting game inspired by the 8-bit classics. Every pixel is generated from code and drawn with nearest-neighbor scaling for that crisp console look.")
+                Text("A retro Home Screen hunting game inspired by the 8-bit classics, plus The Hunter's Quest, a side-scrolling adventure right here in the app. Every pixel and sound is generated from code, with nearest-neighbor scaling for that crisp console look.")
                     .retroBody()
                 Text("No real doves were harmed. They just poof into feathers and fly home.")
                     .retroBody()
