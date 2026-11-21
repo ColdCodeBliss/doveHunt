@@ -223,6 +223,7 @@ python3 -I Tools/generate_pixel_art.py
 ## 6. Companion app
 
 **Home screen** (`ContentView`):
+- **Adapts to every screen shape.** `AppArt.background(for:)` picks whichever of four background widths (`app_background_90/140/280/420`, all 196 px tall with the same ground line) is closest to the screen's aspect ratio. The art fills the screen **anchored to the bottom**, so any cropping removes sky, never the grass or the hunter. The hunter stands at the left edge of the *visible* area, and doves are placed by visible-width fraction and height above the grass, clamped below the header. Verified in previews on iPhone portrait and landscape, iPad, and iPhone Duo (outer display, and inner display open).
 - Full-screen pixel scene (`HuntingScene`): the background and hunter are scaled to fill the screen on one pixel grid. Three doves float ahead of the hunter's aim, bobbing and flapping via a `TimelineView` at 12 fps. Offsets snap to whole art pixels for retro motion.
 - The animation pauses when **Reduce Motion** is on or the *Animated doves* setting is off.
 - "DOVE HUNT" title, the 6-digit score, and an "ADD THE WIDGET TO HUNT!" hint while the score is 0.
@@ -272,3 +273,5 @@ python3 -I Tools/generate_pixel_art.py
 
 - **2026-11-19** Added the **Console Color** widget setting (10 solid colors) and an **NES** colorway with lid lettering, POWER and RESET keys, a power light, and the black strip.
 - **2026-11-19** Made **NES** the default console color, listed first in the picker. Classic Blue is still available.
+
+- **2026-11-19** Fixed the companion app scene on wide screens. On the open iPhone Duo only the top of the hunter's head showed; the app now picks from four background shapes with a bottom-anchored crop. Also fixed a Swift concurrency warning by marking the NES colors `nonisolated`.

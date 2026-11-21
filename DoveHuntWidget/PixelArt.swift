@@ -42,10 +42,10 @@ extension ConsoleColor {
 /// strip shows in the border above and below it. The lettering and buttons are drawn by
 /// `NESDecorations` in the widget content, which knows the exact border sizes.
 struct NESShell: View {
-    static let lidGrey = Color(red: 0.8, green: 0.8, blue: 0.79)
-    static let frontGrey = Color(red: 0.47, green: 0.47, blue: 0.49)
-    static let seam = Color(red: 0.33, green: 0.33, blue: 0.35)
-    static let strip = Color(red: 0.12, green: 0.12, blue: 0.13)
+    nonisolated static let lidGrey = Color(red: 0.8, green: 0.8, blue: 0.79)
+    nonisolated static let frontGrey = Color(red: 0.47, green: 0.47, blue: 0.49)
+    nonisolated static let seam = Color(red: 0.33, green: 0.33, blue: 0.35)
+    nonisolated static let strip = Color(red: 0.12, green: 0.12, blue: 0.13)
 
     var body: some View {
         GeometryReader { proxy in
@@ -67,13 +67,13 @@ struct NESShell: View {
 /// (top left, inset from the corner) and the POWER and RESET buttons on the front (bottom left).
 /// Purely decorative, so it never takes taps away from the shotgun.
 struct NESDecorations: View {
-    static let logoRed = Color(red: 0.78, green: 0.1, blue: 0.14)
-    static let keyGrey = Color(red: 0.6, green: 0.6, blue: 0.62)
-    static let keyHighlight = Color(red: 0.74, green: 0.74, blue: 0.76)
-    static let slotDark = Color(red: 0.2, green: 0.2, blue: 0.22)
-    static let powerLight = Color(red: 0.86, green: 0.12, blue: 0.12)
+    nonisolated static let logoRed = Color(red: 0.78, green: 0.1, blue: 0.14)
+    nonisolated static let keyGrey = Color(red: 0.6, green: 0.6, blue: 0.62)
+    nonisolated static let keyHighlight = Color(red: 0.74, green: 0.74, blue: 0.76)
+    nonisolated static let slotDark = Color(red: 0.2, green: 0.2, blue: 0.22)
+    nonisolated static let powerLight = Color(red: 0.86, green: 0.12, blue: 0.12)
     /// The dark red used for the POWER and RESET labels on the real console.
-    static let labelRed = Color(red: 0.45, green: 0.06, blue: 0.08)
+    nonisolated static let labelRed = Color(red: 0.45, green: 0.06, blue: 0.08)
 
     @Environment(\.widgetContentMargins) private var margins
 

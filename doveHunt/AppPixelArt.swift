@@ -24,9 +24,22 @@ extension Color {
 /// Native sizes of the companion app art, in art pixels.
 /// Keep in sync with Tools/generate_pixel_art.py.
 enum AppArt {
-    static let background = CGSize(width: 90, height: 196)
-    /// First row of the grass in the background art.
+    /// Height shared by every background variant.
+    static let backgroundHeight: CGFloat = 196
+    /// Background widths, one per screen shape: phone portrait, tablet/foldable portrait,
+    /// open-Duo/iPad landscape, and phone landscape (see `APP_BACKGROUND_SIZES` in the generator).
+    static let backgroundWidths: [CGFloat] = [90, 140, 280, 420]
+    /// First row of the grass in the background art (the same in every variant).
     static let groundTop: CGFloat = 170
+
+    /// The background whose shape is closest to the screen's, so as little as possible is cropped.
+    static func background(for screen: CGSize) -> (name: String, size: CGSize) {
+        let screenAspect = screen.width / max(screen.height, 1)
+        let width = backgroundWidths.min { a, b in
+            abs(log(a / backgroundHeight / screenAspect)) < abs(log(b / backgroundHeight / screenAspect))
+        } ?? backgroundWidths[0]
+        return ("app_background_\(Int(width))", CGSize(width: width, height: backgroundHeight))
+    }
     static let hunter = CGSize(width: 38, height: 48)
     static let dove = CGSize(width: 16, height: 14)
 }

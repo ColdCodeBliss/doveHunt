@@ -25,9 +25,11 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 WIDGET_OUTPUT_DIR = os.path.join(ROOT, "DoveHuntWidget", "Assets.xcassets", "PixelArt")
 APP_OUTPUT_DIR = os.path.join(ROOT, "doveHunt", "Assets.xcassets", "PixelArt")
 
-# Native art resolution of the companion app's home screen background.
-# Keep in sync with `AppArt` in doveHunt/AppPixelArt.swift.
-APP_BACKGROUND_SIZE = (90, 196)
+# Native art resolutions of the companion app's home screen background, one per screen shape
+# (phone portrait, tablet/foldable portrait, open-Duo/iPad landscape, phone landscape). All share
+# the same height and ground line, so the hunter stands on the same row in every variant.
+# Keep in sync with `AppArt.backgrounds` in doveHunt/AppPixelArt.swift.
+APP_BACKGROUND_SIZES = [(90, 196), (140, 196), (280, 196), (420, 196)]
 
 # Native art resolution of the console screen for each widget family.
 # Keep in sync with `ArtSpec` in DoveHuntWidget/PixelArt.swift.
@@ -890,8 +892,9 @@ def main():
     for ch in DIGITS:
         write_imageset(f"digit_{ch}", digit(ch).px, WIDGET_OUTPUT_DIR)
 
-    w, h = APP_BACKGROUND_SIZE
-    write_imageset("app_background", app_background(w, h, random.Random("app-background")).px, APP_OUTPUT_DIR)
+    for w, h in APP_BACKGROUND_SIZES:
+        art = app_background(w, h, random.Random(f"app-background-{w}"))
+        write_imageset(f"app_background_{w}", art.px, APP_OUTPUT_DIR)
     write_imageset("hunter", hunter().px, APP_OUTPUT_DIR)
     write_app_icon()
 

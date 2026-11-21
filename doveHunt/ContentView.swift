@@ -120,33 +120,48 @@ struct HuntingScene: View {
     @AppStorage(AppSettings.animatedDovesKey) private var animatedDoves = true
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    /// Resting positions (art pixels) of the doves floating ahead of the hunter.
-    private let doves: [(x: CGFloat, y: CGFloat, phase: Double, facesRight: Bool)] = [
-        (60, 120, 0.0, true),
-        (76, 98, 1.7, true),
-        (52, 80, 3.1, false),
+    /// Where the doves float ahead of the hunter: a fraction of the visible width, and a height
+    /// above the grass in art pixels. Relative placement keeps them in view on any screen shape.
+    private let doves: [(fractionX: CGFloat, aboveGround: CGFloat, phase: Double, facesRight: Bool)] = [
+        (0.66, 50, 0.0, true),
+        (0.84, 72, 1.7, true),
+        (0.58, 90, 3.1, false),
     ]
+
+    /// Approximate height of the title, score, and hint at the top of the screen, in points.
+    private let headerHeight: CGFloat = 230
 
     var body: some View {
         GeometryReader { proxy in
-            let art = AppArt.background
-            // One art pixel in points; the art fills the screen and the overflow is cropped.
-            let scale = max(proxy.size.width / art.width, proxy.size.height / art.height)
+            let screen = proxy.size
+            let art = AppArt.background(for: screen)
+            // One art pixel in points. The art fills the screen; any overflow is cropped from
+            // the sides and from the TOP (the bottom is anchored), so the grass and the hunter
+            // are always on screen, whatever the device or orientation.
+            let scale = max(screen.width / art.size.width, screen.height / art.size.height)
             let origin = CGPoint(
-                x: (proxy.size.width - art.width * scale) / 2,
-                y: (proxy.size.height - art.height * scale) / 2
+                x: (screen.width - art.size.width * scale) / 2,
+                y: screen.height - art.size.height * scale
             )
             let point = { (x: CGFloat, y: CGFloat) in
                 CGPoint(x: origin.x + x * scale, y: origin.y + y * scale)
             }
+            // The part of the art that is actually visible, in art pixels.
+            let visibleMinX = -origin.x / scale
+            let visibleWidth = screen.width / scale
+            let visibleMinY = -origin.y / scale
             let isAnimating = animatedDoves && !reduceMotion
 
             ZStack {
-                AppSprite(name: "app_background", size: art, scale: scale)
-                    .position(point(art.width / 2, art.height / 2))
+                AppSprite(name: art.name, size: art.size, scale: scale)
+                    .position(point(art.size.width / 2, art.size.height / 2))
 
+                // The hunter stands at the left edge of whatever is visible.
                 AppSprite(name: "hunter", size: AppArt.hunter, scale: scale)
-                    .position(point(4 + AppArt.hunter.width / 2, AppArt.groundTop + 3 - AppArt.hunter.height / 2))
+                    .position(point(
+                        (visibleMinX + 4 + AppArt.hunter.width / 2).rounded(),
+                        AppArt.groundTop + 3 - AppArt.hunter.height / 2
+                    ))
 
                 TimelineView(.animation(minimumInterval: 1.0 / 12.0, paused: !isAnimating)) { context in
                     let time = isAnimating ? context.date.timeIntervalSinceReferenceDate : 0
@@ -154,6 +169,13 @@ struct HuntingScene: View {
                     ZStack {
                         ForEach(doves.indices, id: \.self) { index in
                             let dove = doves[index]
+                            let restX = (visibleMinX + visibleWidth * dove.fractionX).rounded()
+                            // Keep doves below the title/score header on short, wide screens.
+                            let belowHeader = visibleMinY + headerHeight / scale + AppArt.dove.height
+                            let restY = min(
+                                max(AppArt.groundTop - dove.aboveGround, belowHeader),
+                                AppArt.groundTop - AppArt.dove.height
+                            ).rounded()
                             // Offsets snap to whole art pixels to keep the retro motion.
                             let dx = (sin(time * 0.7 + dove.phase) * 3).rounded()
                             let dy = (sin(time * 1.6 + dove.phase) * 2).rounded()
@@ -161,7 +183,7 @@ struct HuntingScene: View {
 
                             AppSprite(name: wingsUp ? "dove_wings_up" : "dove_wings_down", size: AppArt.dove, scale: scale)
                                 .scaleEffect(x: dove.facesRight ? 1 : -1)
-                                .position(point(dove.x + dx, dove.y + dy))
+                                .position(point(restX + dx, restY + dy))
                         }
                     }
                 }
