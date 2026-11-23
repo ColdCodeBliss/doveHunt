@@ -34,16 +34,24 @@ struct ContentView: View {
     @State private var destination: MenuDestination?
     /// The side-scrolling adventure that starts right here on the home screen.
     @State private var game = AdventureGame()
+    /// A phone held in portrait: the quest only plays in landscape.
+    @State private var requiresLandscape = false
+    @State private var isInventoryOpen = false
+    /// The item to show when the inventory opens (set when the game opens it for a new pickup).
+    @State private var inventorySelection: InventoryItem?
+    /// Something was picked up since the inventory was last opened.
+    @State private var hasNewItem = false
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
 
     var body: some View {
         ZStack(alignment: .topLeading) {
-            AdventureView(game: game)
+            AdventureView(game: game, requiresLandscape: requiresLandscape, compactHeader: verticalSizeClass == .compact)
                 .ignoresSafeArea()
 
             if game.showsTitle {
                 header
                     .frame(maxWidth: .infinity)
-                    .padding(.top, 72)
+                    .padding(.top, verticalSizeClass == .compact ? 10 : 72)
                     .allowsHitTesting(false)
                     .transition(.opacity)
             } else if !game.isFinished {
@@ -53,9 +61,8 @@ struct ContentView: View {
                     .padding(.vertical, 8)
                     .background(Color.pixelInk.opacity(0.55), ignoresSafeAreaEdges: [])
                     .frame(maxWidth: .infinity)
-                    // Keep clear of the menu button on the left.
-                    .padding(.leading, 72)
-                    .padding(.trailing, 16)
+                    // Keep clear of the menu button on the left and the inventory button on the right.
+                    .padding(.horizontal, 72)
                     .padding(.top, 18)
                     .allowsHitTesting(false)
                     .transition(.opacity)
@@ -64,6 +71,29 @@ struct ContentView: View {
             menuButton
                 .padding(.leading, 16)
                 .padding(.top, 8)
+
+            // Hidden during the alien console mini game.
+            if game.phase != .console {
+                InventoryButton(itemCount: game.inventory.count, hasNewItem: hasNewItem) {
+                    setInventory(open: true)
+                }
+                .frame(maxWidth: .infinity, alignment: .trailing)
+                .padding(.trailing, 16)
+                .padding(.top, 8)
+            }
+
+            if isInventoryOpen {
+                Color.black.opacity(0.55)
+                    .ignoresSafeArea()
+                    .onTapGesture { setInventory(open: false) }
+                    .accessibilityLabel("Close inventory")
+                    .accessibilityAddTraits(.isButton)
+                    .transition(.opacity)
+
+                InventoryView(items: game.inventory, selected: inventorySelection, onClose: { setInventory(open: false) })
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .transition(.scale(scale: 0.9).combined(with: .opacity))
+            }
 
             if isMenuOpen {
                 Color.black.opacity(0.45)
@@ -90,23 +120,45 @@ struct ContentView: View {
             if phase == .active { records.refresh() }
         }
         .animation(.easeInOut(duration: 0.6), value: game.showsTitle)
+        // On phones the quest plays in landscape; portrait shows the title with a rotate prompt.
+        // The geometry transform is Sendable, so it only reads the size; the (main-actor)
+        // device idiom check happens in the action.
+        .onGeometryChange(for: Bool.self) { proxy in
+            proxy.size.height > proxy.size.width && proxy.size.width < 600
+        } action: { isNarrowPortrait in
+            requiresLandscape = isNarrowPortrait && UIDevice.current.userInterfaceIdiom == .phone
+        }
+        .onChange(of: game.inventory.count) { old, new in
+            hasNewItem = new > old
+        }
+        // Right after a pickup, the game opens the inventory on the new item.
+        .onChange(of: game.inventoryRequest) { _, item in
+            guard let item else { return }
+            game.inventoryRequestHandled()
+            setInventory(open: true, showing: item)
+        }
         .onChange(of: game.phase) { _, phase in
             if case .finished = phase { records.refresh() }
         }
     }
 
     /// The Hunter's Quest title screen. Its score is the quest's own, separate from the widget game.
+    /// Short (landscape phone) screens get a compact version so the doves have room to fly.
     private var header: some View {
-        VStack(spacing: 14) {
-            PixelText("DOVE HUNT", pixelSize: 6, scalesWithDynamicType: false)
+        let compact = verticalSizeClass == .compact
+        return VStack(spacing: compact ? 6 : 14) {
+            PixelText("DOVE HUNT", pixelSize: compact ? 4 : 6, scalesWithDynamicType: false)
 
-            PixelText("THE HUNTER'S QUEST", pixelSize: 3, color: .pixelOrange)
+            PixelText("THE HUNTER'S QUEST", pixelSize: compact ? 2 : 3, color: .pixelOrange)
 
-            PixelText("BEST \(String(format: "%06d", min(records.questBestScore, 999_999)))", pixelSize: 3)
+            PixelText("BEST \(String(format: "%06d", min(records.questBestScore, 999_999)))", pixelSize: compact ? 2 : 3)
                 .padding(.horizontal, 12)
-                .padding(.vertical, 8)
+                .padding(.vertical, compact ? 5 : 8)
                 .background(Color.pixelInk.opacity(0.55), ignoresSafeAreaEdges: [])
 
+            if requiresLandscape {
+                PixelText("ROTATE YOUR DEVICE AND", pixelSize: 2, color: .pixelOrange)
+            }
             PixelText("SHOOT THE DOVES TO BEGIN!", pixelSize: 2)
         }
     }
@@ -129,6 +181,19 @@ struct ContentView: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Menu")
+    }
+
+    private func setInventory(open: Bool, showing item: InventoryItem? = nil) {
+        if open {
+            hasNewItem = false
+            inventorySelection = item
+        } else {
+            // Some pickups wait for the inventory to close before the story moves on.
+            game.inventoryClosed()
+        }
+        withAnimation(.snappy(duration: 0.25)) {
+            isInventoryOpen = open
+        }
     }
 
     private func setMenu(open: Bool) {

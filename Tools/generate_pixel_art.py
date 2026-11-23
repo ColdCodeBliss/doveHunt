@@ -648,7 +648,16 @@ def hunter(pose="stand"):
     `pose` is "stand", or a walk-cycle stride: "a" (legs apart) or "b" (legs passing).
     Only the lower legs and boots move, so the frames line up perfectly.
     """
-    back_dx, front_dx = {"stand": (0, 0), "a": (-2, 2), "b": (1, -1)}[pose]
+    # Without his shotgun (taken aboard the UFO): "unarmed", "unarmed_a"/"unarmed_b" strides,
+    # "unarmed_shocked", and "stomach" (clutching his belly, wide-eyed).
+    unarmed = pose.startswith("unarmed") or pose == "stomach"
+    scratch = pose == "scratch"
+    stomach = pose == "stomach"
+    base = {"unarmed": "stand", "unarmed_a": "a", "unarmed_b": "b", "unarmed_shocked": "shocked", "stomach": "shocked",
+            "scratch": "stand"}.get(pose, pose)
+    look_up = base == "look_up"
+    shocked = base == "shocked"
+    back_dx, front_dx = {"stand": (0, 0), "look_up": (0, 0), "shocked": (0, 0), "a": (-2, 2), "b": (1, -1)}[base]
     c = Canvas(38, 48)
     ox, oy = 2, 1
 
@@ -728,6 +737,42 @@ def hunter(pose="stand"):
         put(8, y, cap)
         put(9, y, cap_shade if y > 7 else cap)
 
+    if shocked:
+        # Wide, startled eyes under a raised brow, and a dropped jaw.
+        for x in range(12, 15):
+            put(x, 8, hex_color("#FFFFFF"))
+            put(x, 9, hex_color("#FFFFFF"))
+            put(x, 7, brow)
+        put(13, 8, eye)
+        put(13, 9, eye)
+        put(14, 13, hex_color("#5A1E1E"))
+        put(15, 13, hex_color("#5A1E1E"))
+
+    if look_up:
+        # Head tilted back to the sky: brow and eye raised, chin and moustache forward,
+        # and the cap brim tipped up.
+        for x in range(12, 15):
+            put(x, 8, skin)
+            put(x, 7, brow)
+        put(13, 9, skin)
+        put(14, 8, eye)
+        for x in range(12, 17):
+            put(x, 12, skin)
+        for x in range(13, 18):
+            put(x, 11, brow)
+        put(16, 12, skin)
+        for x in range(16, 20):
+            put(x, 6, TRANSPARENT)
+        for x in range(16, 19):
+            put(x, 5, cap_shade)
+        put(19, 4, cap_shade)
+        # Tip the top of the head back a pixel so the tilt reads at a glance.
+        for y in range(oy + 0, oy + 9):
+            row = [c.get(x, y) for x in range(c.w)]
+            for x in range(ox + 6, ox + 21):
+                c.set(x - 1, y, row[x])
+            c.set(ox + 20, y, TRANSPARENT)
+
     # Rear arm (behind the gun) from shoulder down to the grip.
     def sleeve(x0, y0, x1, y1):
         steps = int(max(abs(x1 - x0), abs(y1 - y0)) * 2) + 1
@@ -737,6 +782,47 @@ def hunter(pose="stand"):
             put(x, y, plaid_at(x, y))
             put(x, y + 1, plaid_at(x, y + 1))
             put(x, y + 2, plaid_dark)
+
+    if scratch:
+        # Puzzled: shotgun hanging from his rear hand, muzzle down, while his front hand
+        # scratches under the cap.
+        for k in range(23):
+            x, y = 3 + k * 0.12, 18 + k
+            put(round(x), round(y), steel if k > 9 else wood)
+            put(round(x) + 1, round(y), steel_dark if k > 9 else wood_dark)
+        for y in range(16, 26):
+            for x in range(2, 5):
+                put(x, y, plaid_dark if x == 4 else plaid_at(x, y))
+        for (hx, hy) in ((2, 26), (3, 26), (2, 27), (3, 27)):
+            put(hx, hy, skin)
+        sleeve(16, 16, 18, 11)                                                  # upper arm up
+        sleeve(18, 10, 16, 6)                                                   # forearm to the head
+        for (hx, hy) in ((15, 5), (16, 5), (15, 6), (16, 6)):
+            put(hx, hy, skin)
+        return outlined(c, hex_color("#26263A"))
+
+
+    if unarmed:
+        # Arms at his sides, or one clutching his stomach.
+        def arm(x0, y0, y1):
+            for y in range(y0, y1):
+                for x in range(x0, x0 + 3):
+                    put(x, y, plaid_dark if x == x0 + 2 else plaid_at(x, y))
+        arm(2, 16, 27)
+        for hx, hy in ((2, 27), (3, 27), (2, 28), (3, 28)):
+            put(hx, hy, skin)
+        if stomach:
+            arm(17, 16, 21)
+            for k in range(8):                                                  # forearm across the belly
+                put(18 - k, 21 + k // 4, plaid_at(18 - k, 21))
+                put(18 - k, 22 + k // 4, plaid_dark)
+            for hx, hy in ((9, 22), (10, 22), (9, 23), (10, 23)):
+                put(hx, hy, skin)
+        else:
+            arm(17, 16, 27)
+            for hx, hy in ((18, 27), (19, 27), (18, 28), (19, 28)):
+                put(hx, hy, skin)
+        return outlined(c, hex_color("#26263A"))
 
     sleeve(7, 17, 12, 21)
 
@@ -1131,6 +1217,1033 @@ def anna(pose="stand"):
     return outlined(c, H("#26263A"))
 
 
+# MARK: - Pond scene (companion app)
+
+POND_SIZE = (52, 15)            # keep in sync with AppArt.pond
+POND_SMALL_SIZE = (34, 12)      # AppArt.pondSmall (narrow screens)
+POND_LARGE_SIZE = (88, 24)      # AppArt.pondLarge (landscape phones and other wide screens)
+ROD_SIZE = (34, 30)             # AppArt.fishingRod; grip at (1, 28), tip at (32, 1)
+ROD_SHORT_SIZE = (20, 22)       # AppArt.fishingRodShort; grip at (1, 20), tip at (18, 1)
+
+
+def pond(size=POND_SIZE, roundness=2.0):
+    """A small pond set into the grass: dark banks, rippling water, lily pads, reeds.
+    `roundness` above 2 fills out the ends into a fuller oval (a superellipse)."""
+    w, h = size
+    c = Canvas(w, h)
+    H = hex_color
+    cx, cy, rx, ry = (w - 1) / 2, h / 2, w / 2 - 1, h / 2 - 1
+    for y in range(h):
+        for x in range(w):
+            d = abs((x - cx) / rx) ** roundness + abs((y - cy) / ry) ** roundness
+            if d <= 1:
+                if d > 0.78:
+                    c.set(x, y, H("#3D6B3A") if y < cy else H("#4A3A24"))      # bank / mud edge
+                else:
+                    depth = y / h
+                    c.set(x, y, H("#4C93DC") if depth < 0.45 else H("#2F72C4"))
+    k = w / 52
+    for (x0, y0, length) in ((10, 5, 6), (24, 9, 8), (34, 4, 5)):
+        for x in range(int(x0 * k), int(x0 * k) + max(3, int(length * k))):
+            c.set(x, min(h - 3, int(y0 * h / 15)), H("#A6D8F8"))                # ripples
+    for (px, py) in ((15, 9), (37, 8)):
+        px, py = int(px * k), min(h - 4, int(py * h / 15))
+        c.rect(px, py, px + 3, py + 2, H("#5DB04A"))                            # lily pads
+        c.set(px + 1, py, H("#2F72C4"))
+    for rx0 in (1, 3, w - 5, w - 3):
+        for y in range(0, 6):
+            c.set(rx0, y, H("#3A5A28"))
+        c.set(rx0, 0, H("#6B4527"))
+    return c
+
+
+def fishing_rod(short=False):
+    """A fishing rod from the grip (bottom-left) to the tip (top-right), with a reel."""
+    w, h = ROD_SHORT_SIZE if short else ROD_SIZE
+    c = Canvas(w, h)
+    H = hex_color
+    gx, gy, tx, ty = (1, 20, 18, 1) if short else (1, 28, 32, 1)
+    steps = 64
+    for i in range(steps + 1):
+        t = i / steps
+        x, y = round(gx + (tx - gx) * t), round(gy + (ty - gy) * t)
+        c.set(x, y, H("#5E3A1A") if t < 0.22 else H("#2A2A30"))
+        if t < 0.22:
+            c.set(x, y + 1, H("#3A2212"))
+    rx, ry = (3, 15) if short else (4, 22)
+    c.rect(rx, ry, rx + 3, ry + 3, H("#A3ADBF"))                                # reel
+    c.set(rx + 1, ry + 1, H("#5C6475"))
+    return c
+
+
+def fisherman(pose="stand"):
+    """A fisherman in olive rubber chest waders with suspenders, a khaki shirt, a bucket hat,
+    and a scruffy beard. Faces right. "stand" holds his arms forward for the rod;
+    "a"/"b" are running strides."""
+    c = Canvas(28, 48)
+    ox, oy = 2, 1
+
+    def put(x, y, color):
+        c.set(ox + x, oy + y, color)
+
+    H = hex_color
+    skin, skin_shade = H("#E8B48C"), H("#C98E68")
+    beard = H("#7A5E48")
+    hat, hat_shade, hat_band = H("#BFA878"), H("#9A8458"), H("#5E4A2A")
+    shirt, shirt_shade = H("#C9B48A"), H("#A8936A")
+    wader, wader_dark, wader_light = H("#55603A"), H("#3B4428"), H("#6F7B4C")
+    boot = H("#2E3420")
+    strap = H("#2E2E24")
+    eye = H("#101018")
+    running = pose != "stand"
+    back_dx, front_dx = {"stand": (0, 0), "a": (-3, 3), "b": (2, -2)}[pose]
+
+    # Wader legs and boots.
+    for x0, dx in ((6, back_dx), (11, front_dx)):
+        for y in range(30, 45):
+            shift = dx if y >= 36 else (dx // 2 if y >= 33 else 0)
+            for x in range(x0 + shift, x0 + shift + 5 + (1 if y >= 43 else 0)):
+                put(x, y, boot if y >= 42 else (wader_dark if x == x0 + shift + 4 else wader))
+    # Wader chest and suspenders over the shirt.
+    for y in range(15, 31):
+        for x in range(6, 17):
+            put(x, y, wader if y >= 20 else shirt)
+        put(6, y, wader_dark if y >= 20 else shirt_shade)
+    for x in range(7, 16):
+        put(x, 20, wader_light)
+    for y in range(15, 21):
+        put(9, y, strap)
+        put(13, y, strap)
+    put(11, 24, wader_light)
+    # Arms: forward for the rod when standing, swinging when running.
+    if running:
+        arm = [(14, y) for y in range(17, 26)] if pose == "a" else [(15 + (y - 17) // 3, y) for y in range(17, 25)]
+    else:
+        arm = [(14 + (y - 17), y) for y in range(17, 21)] + [(17, 21), (18, 21)]
+    for (x, y) in arm:
+        put(x, y, shirt)
+        put(x, y + 1, shirt_shade)
+    hx, hy = arm[-1]
+    put(hx + 1, hy, skin)
+    put(hx + 1, hy + 1, skin_shade)
+    # Head with a scruffy beard, under a bucket hat.
+    for y in range(6, 15):
+        for x in range(8, 16):
+            put(x, y, skin)
+    put(16, 9, skin)
+    put(16, 10, skin_shade)
+    put(13, 8, eye)
+    for y in range(11, 15):
+        for x in range(9, 16):
+            if (x + y) % 3 or y > 12:
+                put(x, y, beard)
+    for y, (x0, x1) in {1: (9, 15), 2: (8, 16), 3: (8, 16), 4: (8, 16)}.items():
+        for x in range(x0, x1):
+            put(x, y, hat)
+    for x in range(8, 16):
+        put(x, 5, hat_band)
+    for x in range(6, 19):
+        put(x, 6, hat_shade)
+    return outlined(c, H("#26263A"))
+
+
+def dog(pose="sit"):
+    """Max: a big brown dog with floppy ears and a red collar. Faces right.
+    Poses: "sit", "stand", and running strides "a"/"b"."""
+    c = Canvas(30, 24)
+    H = hex_color
+    fur, fur_dark, fur_light = H("#8B5A2B"), H("#5E3A1A"), H("#B07A44")
+    nose, eye, collar, tongue = H("#1E1410"), H("#101018"), H("#C8382E"), H("#E07A8A")
+
+    def body(x0, x1, y0, y1):
+        for y in range(y0, y1):
+            for x in range(x0, x1):
+                c.set(x, y, fur_light if y == y0 else (fur_dark if y == y1 - 1 else fur))
+
+    def head(hx, hy):
+        for y in range(hy, hy + 7):
+            for x in range(hx, hx + 8):
+                c.set(x, y, fur if y > hy else fur_light)
+        for y in range(hy + 3, hy + 6):                # snout
+            for x in range(hx + 8, hx + 11):
+                c.set(x, y, fur_light)
+        c.set(hx + 10, hy + 3, nose)
+        c.set(hx + 6, hy + 2, eye)
+        for y in range(hy + 1, hy + 7):                # floppy ear
+            c.set(hx + 2, y, fur_dark)
+            c.set(hx + 3, y, fur_dark)
+        c.rect(hx + 1, hy + 7, hx + 8, hy + 8, collar)
+
+    def leg(x, y0, y1, dx=0):
+        for y in range(y0, y1):
+            shift = dx if y >= (y0 + y1) // 2 else 0
+            c.set(x + shift, y, fur)
+            c.set(x + shift + 1, y, fur_dark)
+        c.set(x + dx, y1 - 1, fur_dark)
+        c.set(x + dx + 1, y1 - 1, fur_dark)
+
+    if pose == "sit":
+        body(6, 18, 10, 21)                            # upright haunches
+        c.rect(4, 17, 9, 22, fur)                      # folded hind leg
+        c.rect(4, 21, 10, 22, fur_dark)
+        leg(14, 15, 22)                                # straight front legs
+        leg(16, 15, 22)
+        head(12, 2)
+        for i, (x, y) in enumerate(((5, 19), (4, 18), (3, 17), (2, 17))):   # tail on the ground
+            c.set(x, y + 3, fur_dark)
+        c.set(21, 7, tongue)
+    else:
+        running = pose in ("a", "b")
+        stride = {"stand": 0, "a": 2, "b": -2}[pose]
+        body(4, 21, 9, 16)                             # long body on four legs
+        leg(5, 15, 22, -stride)
+        leg(8, 15, 22, stride)
+        leg(16, 15, 22, stride)
+        leg(19, 15, 22, -stride)
+        head(19, 3 if not running else 4)
+        for i in range(4):                             # tail up
+            c.set(3 - i // 2, 9 - i, fur_dark)
+        if running:
+            c.set(30 - 1, 8, tongue) if False else c.set(29, 9, tongue)
+    return outlined(c, H("#26263A"))
+
+
+# MARK: - Mallard and more scenery (companion app)
+
+MALLARD_PALETTE = {
+    "K": hex_color("#26263A"),   # outline
+    "G": hex_color("#1F7A3A"),   # green head
+    "g": hex_color("#2E9E4E"),   # head highlight
+    "W": hex_color("#FFFFFF"),   # neck ring
+    "C": hex_color("#8A4A2A"),   # chestnut chest
+    "S": hex_color("#B8BCC6"),   # grey body
+    "s": hex_color("#8E929C"),   # body shade
+    "B": hex_color("#4A5ACC"),   # blue wing speculum
+    "Y": hex_color("#F2C232"),   # bill
+    "E": hex_color("#101018"),   # eye
+    "D": hex_color("#5A4A3A"),   # tail / dark wing
+}
+
+MALLARD_WINGS_UP = [
+    "....KK............",
+    "...KSSK...........",
+    "...KSSsK..........",
+    "....KSSsK.........",
+    "....KSBBsK...KKK..",
+    ".....KSBBsK.KGGGK.",
+    "KKK..KSSSsKKGgEGKYY",
+    "KDDKKSSSSSKWWGGKY.",
+    ".KDDSSSSSSCCCWK...",
+    "..KDsSSSSSCCCK....",
+    "...KKssssKKKK.....",
+    ".....KKKKK........",
+    "..................",
+    "..................",
+]
+
+MALLARD_WINGS_DOWN = [
+    "..................",
+    "..................",
+    "..................",
+    "..................",
+    ".............KKK..",
+    "............KGGGK.",
+    "KKK..KKKKKKKGgEGKYY",
+    "KDDKKSSSSSKWWGGKY.",
+    ".KDDSSSSSSCCCWK...",
+    "..KDsSBBSSCCCK....",
+    "...KKSBBsKKKK.....",
+    "....KSSsK.........",
+    ".....KsK..........",
+    "......K...........",
+]
+
+# The first hit: feathers ruffled, eye squeezed shut, tumbling.
+MALLARD_HIT = [
+    "..K...K...........",
+    "...KSK.K..K.......",
+    "..KSSSK..KSK......",
+    "...KSSsK..K.......",
+    "....KSBBsK...KKK..",
+    ".....KSBBsK.KGGGK.",
+    "KKK..KSSSsKKGgKGKYY",
+    "KDDKKSSSSSKWWGGKYY",
+    ".KDDSSSSSSCCCWK...",
+    "..KDsSSSSSCCCK..K.",
+    "...KKssssKKKK..KSK",
+    ".....KKKKK......K.",
+    "...K.........K....",
+    "..KSK.......KSK...",
+]
+
+
+def bird_sprite(rows, palette):
+    width = max(len(r) for r in rows)
+    padded = [r.ljust(width, ".") for r in rows]
+    return sprite(padded, palette)
+
+
+def prop_pine():
+    """A tall green pine tree for scenery variety."""
+    c = Canvas(26, 50)
+    H = hex_color
+    dark, mid, light, trunk = H("#1F5A2E"), H("#2E7D42"), H("#4FA35E"), H("#5A3519")
+    c.rect(11, 42, 15, 50, trunk)
+    c.rect(11, 42, 12, 50, H("#7A4E2C"))
+    tiers = [(2, 14, 8), (10, 26, 10), (18, 40, 12)]
+    for top, bottom, half_max in tiers:
+        for y in range(top, bottom):
+            half = int(1 + (y - top) / (bottom - top) * half_max)
+            for x in range(13 - half, 13 + half + 1):
+                if 0 <= x < 26:
+                    edge = x <= 13 - half + 1
+                    c.set(x, y, light if edge else (dark if x > 13 + half // 2 else mid))
+    return outlined(c, H("#163A20"))
+
+
+def tackle_box():
+    """The fisherman's green tackle box: a carry handle, a hinged lid with a silver latch,
+    and a red-and-white lure hooked on the side."""
+    c = Canvas(16, 12)
+    H = hex_color
+    handle, lid, lid_light, body, body_dark = H("#9AA3B2"), H("#3F9A4E"), H("#66C06C"), H("#2E7D42"), H("#22603A")
+    for x in range(5, 11):
+        c.set(x, 0, handle)                                                     # handle bar
+    c.set(5, 1, handle)
+    c.set(10, 1, handle)
+    c.rect(1, 2, 15, 5, lid)
+    c.rect(1, 2, 15, 3, lid_light)                                              # lid highlight
+    c.rect(1, 5, 15, 6, body_dark)                                              # lid seam
+    c.rect(1, 6, 15, 11, body)
+    c.rect(1, 10, 15, 11, body_dark)
+    c.rect(7, 4, 9, 7, H("#D8DDE6"))                                            # latch
+    c.set(13, 7, H("#D9342B"))                                                  # lure
+    c.set(13, 8, H("#F4F4F4"))
+    c.set(13, 9, H("#D9342B"))
+    return outlined(c, H("#15301C"))
+
+
+def arrow_down():
+    """A chunky orange arrow pointing down, for "tap this"."""
+    c = Canvas(9, 10)
+    H = hex_color
+    orange, light = H("#F08A24"), H("#FFC66B")
+    c.rect(3, 1, 6, 5, orange)
+    c.rect(3, 1, 4, 5, light)
+    for row, half in enumerate((3, 2, 1, 0)):
+        c.rect(4 - half, 5 + row, 5 + half, 6 + row, orange)
+    return outlined(c, H("#2A1A0C"))
+
+
+def crate_icon():
+    """A small wooden supply crate: planks in a frame with a diagonal brace (inventory button)."""
+    c = Canvas(16, 16)
+    H = hex_color
+    plank, plank_dark, frame, brace = H("#C08A48"), H("#8E5E2C"), H("#6B4527"), H("#D9A562")
+    c.rect(1, 1, 15, 15, plank)
+    for y in (5, 10):
+        c.rect(3, y, 13, y + 1, plank_dark)                                     # plank seams
+    c.rect(1, 1, 15, 3, frame)
+    c.rect(1, 13, 15, 15, frame)
+    c.rect(1, 1, 3, 15, frame)
+    c.rect(13, 1, 15, 15, frame)
+    for i in range(10):
+        c.set(3 + i, 12 - i, brace)                                             # diagonal brace
+        c.set(3 + i, 11 - i, brace)
+    for (x, y) in ((2, 2), (13, 2), (2, 13), (13, 13)):
+        c.set(x, y, H("#C9CED8"))                                               # nails
+    return outlined(c, H("#2A1A0C"))
+
+
+MALLARD_FLOAT = [
+    "............KKK....",
+    "...........KGGGK...",
+    "...........KGgEGKYY",
+    "...........KWWGGKY.",
+    "KKK.KKKKKKKKCCCWK..",
+    "KDDKSSSSSSSSCCCK...",
+    ".KDsSSSBBBSSCCK....",
+    "..KsssSSSSsssK.....",
+    "...KKKKKKKKKK......",
+]
+
+
+def fill_ellipse(c, cx, cy, rx, ry, color):
+    for y in range(int(cy - ry) - 1, int(cy + ry) + 2):
+        for x in range(int(cx - rx) - 1, int(cx + rx) + 2):
+            if rx > 0 and ry > 0 and ((x - cx) / rx) ** 2 + ((y - cy) / ry) ** 2 <= 1:
+                c.set(x, y, color)
+
+
+def thick_line(c, x0, y0, x1, y1, width, color):
+    steps = max(1, int(max(abs(x1 - x0), abs(y1 - y0)) * 2))
+    for i in range(steps + 1):
+        t = i / steps
+        x, y = x0 + (x1 - x0) * t, y0 + (y1 - y0) * t
+        for dy in range(width):
+            for dx in range(width):
+                c.set(int(round(x - width / 2 + dx)), int(round(y - width / 2 + dy)), color)
+
+
+def poop_drop():
+    """A falling white dropping."""
+    c = Canvas(3, 4)
+    W, w = hex_color("#F6F6EE"), hex_color("#C9CCBE")
+    for (x, y, col) in ((1, 0, w), (0, 1, w), (1, 1, W), (2, 1, w), (0, 2, w), (1, 2, W), (2, 2, w), (1, 3, w)):
+        c.set(x, y, col)
+    return c
+
+
+def poop_splat():
+    """A bird-dropping splat on the hunter's clothes."""
+    rows = [
+        "..W...",
+        ".WWW.W",
+        "WWWWW.",
+        ".WgWW.",
+        "..W.W.",
+    ]
+    return sprite(rows, {"W": hex_color("#F6F6EE"), "g": hex_color("#B4BCA2")})
+
+
+BEAR_FUR, BEAR_DARK, BEAR_LIGHT = "#6B4423", "#4A2E17", "#8A5A30"
+BEAR_SNOUT, BEAR_NOSE = "#A57B52", "#1A1010"
+
+
+def bear_four(pose="stand"):
+    """A big brown bear on all fours, facing right. Poses: "stand", "roar" (mouth open,
+    head raised), and running strides "a"/"b"."""
+    c = Canvas(54, 32)
+    H = hex_color
+    fur, dark, light = H(BEAR_FUR), H(BEAR_DARK), H(BEAR_LIGHT)
+    stride = {"stand": 0, "roar": 0, "a": 3, "b": -3}[pose]
+    lift = 1 if pose in ("a", "b") else 0
+    # Legs first so the body overlaps their tops.
+    for x, sign in ((8, -1), (15, 1), (31, 1), (38, -1)):
+        for y in range(19 - lift, 30):
+            shift = stride * sign if y >= 25 else 0
+            c.rect(x + shift, y, x + shift + 5, y + 1, dark if x in (8, 31) else fur)
+        c.rect(x + stride * sign, 29, x + stride * sign + 6, 31, dark)          # paws
+    fill_ellipse(c, 24, 16 - lift, 19, 9, fur)
+    fill_ellipse(c, 33, 10 - lift, 9, 5, fur)                                   # shoulder hump
+    for x in range(6, 42):                                                      # back highlight
+        for y in range(0, 32):
+            if c.get(x, y) == fur:
+                c.set(x, y, light)
+                break
+    head_y = (11 if pose == "roar" else 14) - lift
+    fill_ellipse(c, 44, head_y, 7, 6, fur)
+    fill_ellipse(c, 41, head_y - 6, 2, 2, dark)                                 # ears
+    fill_ellipse(c, 47, head_y - 6, 2, 2, dark)
+    c.rect(48, head_y, 54, head_y + 5, H(BEAR_SNOUT))                           # snout
+    c.rect(52, head_y, 54, head_y + 2, H(BEAR_NOSE))
+    c.set(46, head_y - 2, H("#0E0E14"))                                         # eye
+    if pose == "roar":
+        c.rect(47, head_y + 5, 54, head_y + 9, H("#7E1A1A"))                    # open jaw
+        for x in (48, 50, 52):
+            c.set(x, head_y + 5, H("#F4F4EE"))                                  # teeth
+        c.rect(48, head_y + 9, 54, head_y + 10, H(BEAR_SNOUT))                  # lower jaw
+    return outlined(c, H("#22140A"))
+
+
+def bear_standing():
+    """The bear reared up on its hind legs, arms raised, facing right."""
+    c = Canvas(36, 58)
+    H = hex_color
+    fur, dark, light = H(BEAR_FUR), H(BEAR_DARK), H(BEAR_LIGHT)
+    for x0 in (9, 17):                                                          # hind legs
+        c.rect(x0, 44, x0 + 7, 55, fur)
+        c.rect(x0, 54, x0 + 9, 57, dark)                                        # feet
+    thick_line(c, 11, 25, 5, 13, 4, dark)                                       # back arm, raised
+    fill_ellipse(c, 16, 33, 11, 14, fur)
+    fill_ellipse(c, 18, 36, 6, 9, light)                                        # belly
+    thick_line(c, 22, 25, 30, 12, 4, fur)                                       # front arm, raised
+    for (x, y) in ((30, 9), (32, 10), (33, 12)):
+        c.set(x, y, H("#E8E4D8"))                                               # claws
+    for (x, y) in ((4, 10), (6, 9)):
+        c.set(x, y, H("#E8E4D8"))
+    fill_ellipse(c, 19, 12, 7, 6, fur)
+    fill_ellipse(c, 14, 6, 2, 2, dark)                                          # ears
+    fill_ellipse(c, 21, 5, 2, 2, dark)
+    c.rect(24, 11, 31, 16, H(BEAR_SNOUT))
+    c.rect(29, 11, 31, 13, H(BEAR_NOSE))
+    c.set(22, 9, H("#0E0E14"))
+    return outlined(c, H("#22140A"))
+
+
+def deer(pose="stand", fawn=False):
+    """A deer facing right. The fawn is a smaller copy with white spots.
+    Poses: "drink" (head down to the water), "stand" (alert), and leaping strides "a"/"b"."""
+    s = 0.68 if fawn else 1.0
+    w, h = (30, 28) if fawn else (44, 40)
+    c = Canvas(w, h)
+    H = hex_color
+    fur, dark, belly, white, hoof = H("#A0643A"), H("#7A4A26"), H("#D9B08A"), H("#F4EFE6"), H("#2A1A10")
+    S = lambda v: v * s
+
+    def line(x0, y0, x1, y1, width, color):
+        thick_line(c, S(x0), S(y0), S(x1), S(y1), max(1, round(width * s)), color)
+
+    lift = {"a": 4, "b": 2}.get(pose, 0)
+    # Legs.
+    if pose == "a":                                   # stretched out mid-leap
+        legs = (((12, 25), (3, 32)), ((15, 25), (6, 33)), ((27, 25), (37, 31)), ((31, 25), (41, 30)))
+    elif pose == "b":                                 # gathered under the body
+        legs = (((12, 26), (17, 37)), ((15, 26), (20, 37)), ((27, 26), (23, 37)), ((31, 26), (27, 37)))
+    else:
+        legs = (((11, 25), (11, 38)), ((15, 25), (15, 38)), ((27, 25), (27, 38)), ((31, 25), (31, 38)))
+    for (x0, y0), (x1, y1) in legs:
+        line(x0, y0 - lift, x1, y1 - lift, 2, dark)
+        line(x1, y1 - lift, x1, y1 - lift + 1, 2, hoof)
+    fill_ellipse(c, S(20), S(21 - lift), S(12), S(6), fur)
+    fill_ellipse(c, S(20), S(24 - lift), S(8), S(2.5), belly)
+    # Neck and head.
+    if pose == "drink":
+        line(29, 19, 36, 31, 4, fur)
+        fill_ellipse(c, S(38), S(33), S(4), S(3), fur)
+        line(39, 34, 41, 37, 2, fur)
+        c.set(int(S(41)), int(S(37)), hoof)                                     # nose
+        c.set(int(S(37)), int(S(32)), hoof)                                     # eye
+        line(34, 29, 33, 26, 2, dark)                                           # ear
+    else:
+        line(29, 19 - lift, 34, 9 - lift, 4, fur)
+        fill_ellipse(c, S(36), S(7 - lift), S(4), S(3), fur)
+        line(38, 7 - lift, 41, 8 - lift, 2, fur)
+        c.set(int(S(41)), int(S(8 - lift)), hoof)
+        c.set(int(S(37)), int(S(6 - lift)), hoof)
+        line(33, 4 - lift, 32, 1 - lift, 2, dark)                               # ears
+        line(35, 4 - lift, 36, 1 - lift, 2, dark)
+    # White tail, flagged up when running.
+    if pose in ("a", "b"):
+        line(8, 17 - lift, 6, 13 - lift, 2, white)
+    else:
+        line(8, 17, 7, 20, 2, white)
+    if fawn:
+        for (x, y) in ((14, 19), (19, 18), (24, 19), (17, 22), (22, 22), (12, 22)):
+            c.set(int(S(x)), int(S(y - lift)), white)
+    return outlined(c, H("#2A1A10"))
+
+
+def prop_stream(size=(150, 18)):
+    """A long, winding stream set into the grass, with tapered ends and a few reeds."""
+    w, h = size
+    c = Canvas(w, h)
+    H = hex_color
+    for x in range(w):
+        taper = min(1.0, min(x, w - 1 - x) / 14)
+        top = 2 + 1.5 * math.sin(x * 0.08) + (1 - taper) * 5
+        bottom = h - 3 + 1.5 * math.sin(x * 0.06 + 1) - (1 - taper) * 5
+        if bottom - top < 2:
+            continue
+        for y in range(int(top), int(bottom) + 1):
+            if y <= top + 1:
+                color = H("#3D6B3A")                                            # far bank
+            elif y >= bottom - 1:
+                color = H("#4A3A24")                                            # near mud bank
+            else:
+                color = H("#4C93DC") if y < (top + bottom) / 2 else H("#2F72C4")
+            c.set(x, y, color)
+    for (x0, y0, length) in ((24, 7, 9), (60, 10, 12), (98, 6, 8), (126, 11, 7)):
+        for x in range(x0, x0 + length):
+            if c.get(x, y0) and c.get(x, y0)[3]:
+                c.set(x, y0, H("#A6D8F8"))                                      # ripples
+    for rx0 in (10, 12, w - 13, w - 11):
+        for y in range(0, 6):
+            c.set(rx0, y, H("#3A5A28"))
+        c.set(rx0, 0, H("#6B4527"))
+    return c
+
+
+def chain_fence(open_gate=False):
+    """A chain-link fence (98x40: the gate plus three panels), closed or swung open."""
+    w, h = 98, 40
+    c = Canvas(w, h)
+    H = hex_color
+    mesh, post, post_dark, rail = H("#A9B1BC", 210), H("#8C939E"), H("#5C6370"), H("#9AA2AE")
+    gate_w = 26
+    for y in range(2, h - 1):
+        for x in range(0, w):
+            if x < gate_w and open_gate:
+                continue
+            if (x + y) % 4 == 0 or (x - y) % 4 == 0:
+                c.set(x, y, mesh)
+    c.rect(0 if not open_gate else gate_w, 0, w, 2, rail)                       # top rail
+    for x0 in list(range(gate_w, w, 24)) + [w - 2]:
+        c.rect(x0, 0, x0 + 2, h, post)                                          # posts
+        c.set(x0 + 1, 0, post_dark)
+    c.rect(0, 0, 2, h, post)                                                    # latch post
+    if open_gate:
+        # The gate swung toward us on its hinges: a narrow, foreshortened panel by the hinge post.
+        for y in range(3, h - 2):
+            for x in range(gate_w - 7, gate_w - 1):
+                if (x + y) % 3 == 0:
+                    c.set(x, y, mesh)
+        c.rect(gate_w - 8, 3, gate_w - 7, h - 2, post)
+        c.rect(gate_w - 8, 3, gate_w - 1, 4, post)
+        c.rect(gate_w - 8, h - 3, gate_w - 1, h - 2, post)
+        c.rect(2, h - 2, gate_w - 8, h, H("#8A6A44"))                           # the trail beyond
+    else:
+        c.rect(2, 3, gate_w, 4, post)                                           # gate frame
+        c.rect(2, h - 3, gate_w, h - 2, post)
+        c.rect(3, 3, 4, h - 2, post)
+        for i in range(gate_w - 6):
+            c.set(4 + i, h - 4 - int(i * (h - 8) / (gate_w - 6)), post_dark)    # diagonal brace
+    return outlined(c, H("#3A404C"))
+
+
+def far_mountain():
+    """A lone, hazy mountain far behind the restricted gate, with a dirt trail that starts at
+    the bottom (right behind the gate) and switchbacks up its face. Flat bottom on the horizon."""
+    w, h = 130, 76
+    c = Canvas(w, h)
+    H = hex_color
+    peak_x, peak_y = 74, 2
+    for x in range(w):
+        # The right flank is steeper so the whole slope reaches the ground inside the sprite.
+        slope = 1.0 if x <= peak_x else (h - peak_y) / (w - 2 - peak_x)
+        top = peak_y + abs(x - peak_x) * slope
+        lit = x <= peak_x
+        for y in range(max(int(top), 0), h):
+            if y - top < 4 and top < 16:
+                color = H("#F4F8FF") if lit else H("#D6E0EE")                  # snowcap
+            else:
+                color = H("#9AA8C4") if lit else H("#7C8AA6")                  # lit / shaded face
+            c.set(x, y, color)
+    # The trail: from the bottom-left (x 14, right behind the gate) along the foothills, then
+    # up the face in switchbacks toward the peak.
+    dirt, dirt_light = H("#8A6238"), H("#D2AA70")
+    points = [(14, h - 1), (34, 70), (84, 62), (62, 50), (90, 40), (68, 30), (82, 20), (76, 12)]
+    for (x0, y0), (x1, y1) in zip(points, points[1:]):
+        steps = max(abs(x1 - x0), abs(y1 - y0)) * 2
+        for i in range(steps + 1):
+            t = i / steps
+            x, y = round(x0 + (x1 - x0) * t), round(y0 + (y1 - y0) * t)
+            c.set(x, y, dirt_light)
+            c.set(x, y + 1, dirt)
+    return c
+
+
+def ufo(frame=0):
+    """A classic flying saucer: glass dome, silver disc, blinking rim lights, green glow underneath."""
+    w, h = 40, 18
+    c = Canvas(w, h)
+    H = hex_color
+    fill_ellipse(c, 19.5, 10, 19, 4.2, H("#B8C0CC"))                           # disc
+    for x in range(w):
+        for y in range(0, 10):
+            if c.get(x, y) and c.get(x, y)[3]:
+                c.set(x, y, H("#D8DEE6"))                                       # lit top of the disc
+    c.rect(1, 10, w - 1, 11, H("#6E7684"))                                      # rim band
+    for y in range(1, 8):                                                       # glass dome
+        for x in range(12, 28):
+            if ((x - 19.5) / 7.5) ** 2 + ((y - 7.5) / 6.5) ** 2 <= 1:
+                c.set(x, y, H("#8FE3E8"))
+    c.set(16, 3, H("#E8FFFF"))
+    c.set(17, 3, H("#E8FFFF"))
+    c.set(16, 4, H("#E8FFFF"))
+    colors = (H("#FFE14A"), H("#FF5A4A")) if frame == 0 else (H("#FF5A4A"), H("#FFE14A"))
+    for i, x in enumerate(range(5, 36, 6)):                                     # rim lights
+        c.set(x, 10, colors[i % 2])
+        c.set(x + 1, 10, colors[i % 2])
+    fill_ellipse(c, 19.5, 14.5, 6, 1.8, H("#7CFF7C"))                           # tractor glow
+    return outlined(c, H("#2A2E38"))
+
+
+def beam_ring():
+    """One green tractor-beam ring (an ellipse outline)."""
+    w, h = 24, 6
+    c = Canvas(w, h)
+    green, light = hex_color("#7CFF7C"), hex_color("#D8FFD0")
+    for x in range(w):
+        for y in range(h):
+            d = ((x - 11.5) / 11.5) ** 2 + ((y - 2.5) / 2.5) ** 2
+            if 0.55 <= d <= 1.05:
+                c.set(x, y, light if y <= 1 else green)
+    return c
+
+
+def dirt_path():
+    """A tileable strip of dirt trail (64x10) with pebbles and ragged edges."""
+    w, h = 64, 10
+    c = Canvas(w, h)
+    H = hex_color
+    rng = random.Random("dirt-path")
+    base, dark, light = H("#8A6A44"), H("#6E5232"), H("#A88458")
+    for x in range(w):
+        for y in range(h):
+            edge = y == 0 or y == h - 1
+            if edge and rng.random() < 0.45:
+                continue                                                        # ragged edges
+            roll = rng.random()
+            c.set(x, y, dark if roll < 0.12 else (light if roll < 0.2 else base))
+    return c
+
+
+def alien(pose="stand", coat=False, clipboard=False, scared=False):
+    """A little green alien in a silver suit, facing right: a big head with a huge black eye.
+    Poses: "stand", and walking strides "a"/"b". `coat` puts it in a white lab coat, `clipboard`
+    has it holding one, and `scared` gives it wide, white-rimmed eyes and a screaming mouth."""
+    c = Canvas(22, 36)
+    H = hex_color
+    skin, skin_dark, suit, suit_dark = H("#6BD66B"), H("#3FA04A"), H("#B8C0CC"), H("#8A93A2")
+    if coat:
+        suit, suit_dark = H("#F2F4F8"), H("#C9CED8")
+    stride = {"stand": 0, "a": 2, "b": -2}[pose]
+    # Legs (suit), striding.
+    for x0, sign in ((8, 1), (12, -1)):
+        for y in range(28, 35):
+            shift = stride * sign if y >= 31 else 0
+            c.rect(x0 + shift, y, x0 + shift + 2, y + 1, suit_dark if x0 == 8 else suit)
+        c.rect(x0 + stride * sign, 34, x0 + stride * sign + 3, 36, H("#4A505C"))           # boots
+    c.rect(7, 18, 15, 29, suit)                                                 # body
+    c.rect(7, 18, 8, 29, suit_dark)
+    c.rect(10, 16, 12, 19, skin_dark)                                           # neck
+    fill_ellipse(c, 11, 9, 8, 8, skin)                                          # big head
+    for y in range(2, 17):
+        for x in range(4, 8):
+            if c.get(x, y) == skin:
+                c.set(x, y, skin_dark)                                          # shade at the back
+    if scared:
+        # Wide, white-rimmed eyes and a screaming "O" mouth.
+        fill_ellipse(c, 15.5, 8, 3.8, 3.4, H("#FFFFFF"))
+        fill_ellipse(c, 16, 8, 1.6, 1.6, H("#101018"))
+        c.rect(15, 12, 18, 15, H("#2A0E18"))
+        c.set(16, 13, H("#C8384A"))
+    else:
+        for y, (x0, x1) in {6: (15, 17), 7: (13, 18), 8: (13, 19), 9: (14, 19), 10: (15, 18)}.items():
+            for x in range(x0, x1):
+                c.set(x, y, H("#101018"))                                       # big slanted almond eye
+        c.set(16, 7, H("#5A5A70"))                                              # glint
+        c.set(17, 13, skin_dark)                                                # mouth
+    if coat:
+        c.rect(7, 28, 15, 31, suit)                                             # coat tails
+        c.set(11, 20, suit_dark)                                                # lapels
+        c.set(11, 22, suit_dark)
+        c.set(11, 24, suit_dark)
+    if clipboard:
+        thick_line(c, 13, 20, 15, 23, 2, skin)                                  # arm bent, holding it up
+        c.rect(15, 19, 21, 27, H("#8B5A2B"))                                    # clipboard
+        c.rect(16, 21, 20, 26, H("#F4F4EE"))
+        c.rect(17, 19, 19, 21, H("#9AA2AE"))                                    # clip
+        for y in (22, 24):
+            c.rect(16, y, 20, y + 1, H("#9AA2AE"))
+    else:
+        thick_line(c, 13, 20, 16, 27, 2, skin)                                  # arm
+        c.set(16, 28, skin)
+        c.set(17, 28, skin)
+    return outlined(c, H("#163A1C"))
+
+
+def metal_table():
+    """A metal lab table with a thick top and braced legs."""
+    c = Canvas(46, 22)
+    H = hex_color
+    top, top_light, leg, leg_dark = H("#9AA2AE"), H("#C9CED8"), H("#6E7684"), H("#4A505C")
+    c.rect(0, 0, 46, 4, top)
+    c.rect(0, 0, 46, 1, top_light)
+    for x0 in (3, 39):
+        c.rect(x0, 4, x0 + 4, 22, leg)
+        c.rect(x0 + 3, 4, x0 + 4, 22, leg_dark)
+    c.rect(7, 14, 39, 16, leg_dark)                                             # crossbar
+    return outlined(c, H("#2A2E38"))
+
+
+def shotgun_item():
+    """The hunter's shotgun lying flat, stock on the left."""
+    c = Canvas(36, 7)
+    H = hex_color
+    wood_light, wood, wood_dark = H("#B98049"), H("#8B5A2B"), H("#5E3A1A")
+    steel_light, steel, steel_dark = H("#A3ADBF"), H("#5C6475"), H("#3A404C")
+    c.rect(1, 2, 10, 6, wood)                                                   # stock
+    c.rect(1, 2, 10, 3, wood_light)
+    c.rect(1, 5, 4, 6, wood_dark)
+    c.rect(10, 2, 15, 5, steel)                                                 # receiver
+    c.rect(10, 4, 15, 5, steel_dark)
+    c.rect(15, 3, 21, 5, wood_dark)                                             # forend
+    c.rect(15, 2, 35, 3, steel_light)                                           # barrel
+    c.rect(21, 3, 35, 4, steel)
+    return outlined(c, H("#26263A"))
+
+
+def gas_puff():
+    """A small, sickly green-yellow puff of gas: three overlapping blobs with a shaded underside."""
+    c = Canvas(14, 10)
+    H = hex_color
+    light, mid = H("#C9E07A"), H("#9DBE52")
+    for (cx, cy, r) in ((4.5, 5.5, 3.6), (8.5, 4.0, 3.8), (10.0, 6.5, 2.8)):
+        fill_ellipse(c, cx, cy, r, r * 0.9, light)
+    for x in range(14):
+        for y in range(6, 10):
+            if c.get(x, y) == light:
+                c.set(x, y, mid)                                                # shaded underside
+    c.set(7, 2, H("#F0F8C8"))
+    c.set(8, 2, H("#F0F8C8"))
+    return outlined(c, H("#6E8A3A"))
+
+
+def vat(part="back"):
+    """A tall glass specimen vat on a metal base (26x48).
+    "back": the base, cap, and the glowing green liquid inside (drawn behind the floating bird).
+    "front": the glass itself, a translucent green tint and highlights (drawn over the bird).
+    "broken": the base with jagged glass shards; the liquid is gone."""
+    w, h = 26, 48
+    c = Canvas(w, h)
+    H = hex_color
+    metal, metal_light, metal_dark = H("#8C939E"), H("#C9CED8"), H("#4A505C")
+    if part in ("back", "broken"):
+        c.rect(0, 38, w, h, H("#5C6370"))                                       # base
+        c.rect(0, 38, w, 39, metal_light)
+        c.rect(0, h - 2, w, h, metal_dark)
+        c.rect(2, 36, w - 2, 38, metal)                                         # bottom ring
+    if part in ("back", "broken"):
+        # The metal frame (cap and two side posts) survives the shot, so the alarm stays mounted.
+        c.rect(1, 0, w - 1, 4, metal)                                           # cap
+        c.rect(1, 0, w - 1, 1, metal_light)
+        c.rect(1, 4, 3, 36, metal_dark)                                         # side posts
+        c.rect(w - 3, 4, w - 1, 36, metal_dark)
+    if part == "back":
+        c.rect(3, 4, w - 3, 36, H("#10201A", 200))                              # dark interior
+        c.rect(3, 9, w - 3, 36, H("#3FBF5A", 215))                              # the liquid
+        c.rect(3, 9, w - 3, 10, H("#8CF09A", 230))                              # its surface
+        for (x, y) in ((7, 30), (18, 25), (10, 19), (15, 33), (19, 14)):
+            c.set(x, y, H("#B8FFC0", 230))                                      # bubbles
+        return outlined(c, H("#26263A"))
+    if part == "front":
+        c.rect(3, 9, w - 3, 36, H("#3FBF5A", 70))                               # liquid tint over the bird
+        c.rect(3, 4, 4, 36, H("#E8F4FF", 150))                                  # glass edges
+        c.rect(w - 4, 4, w - 3, 36, H("#E8F4FF", 110))
+        c.rect(6, 6, 7, 34, H("#FFFFFF", 120))                                  # highlight streaks
+        c.rect(8, 8, 9, 20, H("#FFFFFF", 60))
+        return c
+    # Broken: jagged shards rising from the bottom ring and hanging from the cap.
+    shard = H("#D8ECF4", 190)
+    for x0, height in ((4, 7), (7, 3), (10, 5), (13, 2), (16, 6), (19, 3), (21, 6)):
+        for k in range(height):
+            c.set(x0 + (k % 2), 35 - k, shard)
+    for x0, height in ((4, 5), (8, 2), (12, 4), (17, 3), (20, 6)):
+        for k in range(height):
+            c.set(x0 + (k % 2), 4 + k, shard)
+    return outlined(c, H("#26263A"))
+
+
+def bird_skeleton(kind="dove", reach=False, stride=0, coat=False):
+    """A risen bird skeleton standing upright like a little zombie, facing right.
+    `reach` stretches its wing bones out in front; `stride` shuffles its legs."""
+    s = 1.0 if kind == "dove" else 1.25
+    w, h = (18, 24) if kind == "dove" else (22, 30)
+    c = Canvas(w, h)
+    H = hex_color
+    bone, bone_dark, socket = H("#EDE6D2"), H("#B9AF96"), H("#1A1414")
+    S = lambda v: v * s
+
+    def line(x0, y0, x1, y1, width=1, color=bone):
+        thick_line(c, S(x0), S(y0), S(x1), S(y1), width, color)
+
+    fill_ellipse(c, S(9), S(4.5), S(3.6), S(3.2), bone)                         # skull
+    c.set(int(S(10)), int(S(4)), socket)                                        # eye socket
+    c.set(int(S(11)), int(S(4)), socket)
+    if kind == "dove":
+        line(12.5, 4.5, 15, 5.5, 1, H("#E8C56A"))                               # little beak
+    else:
+        line(12.5, 5.5, 16.5, 6, 2, H("#E8C56A"))                               # flat duck bill
+    line(8, 8, 8, 16)                                                           # spine
+    for y in (9.5, 11.5, 13.5):
+        line(6, y, 10.5, y, 1, bone_dark if y > 12 else bone)                   # ribs
+    line(6, 16, 10, 16, 2)                                                      # pelvis
+    if reach:
+        line(9, 9, 16, 9)                                                       # wing bones out front
+        line(9, 10, 16, 11)
+        for x in (14, 16):
+            line(x, 9, x + 1, 7, 1, bone_dark)                                  # feather-bone "fingers"
+    else:
+        line(8, 9, 5, 15)
+        line(9, 9, 11, 15)
+    if coat:
+        # A lab coat over the ribs, and a clipboard held up in front.
+        c.rect(int(S(5)), int(S(8)), int(S(12)) + 1, int(S(18)) + 1, H("#F2F4F8"))
+        c.rect(int(S(5)), int(S(8)), int(S(6)), int(S(18)) + 1, H("#C9CED8"))
+        c.set(int(S(9)), int(S(10)), H("#C9CED8"))
+        c.set(int(S(9)), int(S(13)), H("#C9CED8"))
+        c.rect(int(S(11)), int(S(9)), int(S(15)) + 1, int(S(15)) + 1, H("#8B5A2B"))
+        c.rect(int(S(12)), int(S(10)), int(S(14)) + 1, int(S(14)) + 1, H("#F4F4EE"))
+        line(10, 12, 12, 11, 1, bone)                                           # bony hand on it
+    line(7, 16, 6 + stride, 22)                                                 # legs
+    line(9, 16, 10 - stride, 22)
+    line(6 + stride, 22, 8 + stride, 22)                                        # feet
+    line(10 - stride, 22, 12 - stride, 22)
+    return outlined(c, H("#3A3428"))
+
+
+def clipboard():
+    """The scientist's clipboard: a brown board, a metal clip, and a page of alien notes."""
+    c = Canvas(12, 15)
+    H = hex_color
+    c.rect(1, 2, 11, 15, H("#8B5A2B"))
+    c.rect(2, 4, 10, 14, H("#F4F4EE"))
+    c.rect(4, 1, 8, 4, H("#9AA2AE"))
+    c.set(5, 1, H("#C9CED8"))
+    for y in (6, 8, 10, 12):
+        c.rect(3, y, 9 if y != 12 else 6, y + 1, H("#6FBF6F"))                  # squiggly alien notes
+    return outlined(c, H("#2A1A0C"))
+
+
+def padlock(glow=False):
+    """A small black padlock (glow=True adds a bright yellow rim for the "shoot me" flash)."""
+    c = Canvas(9, 10)
+    H = hex_color
+    shackle, body, key = H("#5C6370"), H("#16161C"), H("#8C939E")
+    for (x, y) in ((3, 1), (4, 1), (5, 1), (2, 2), (6, 2), (2, 3), (6, 3)):
+        c.set(x, y, shackle)
+    c.rect(1, 4, 8, 9, body)
+    c.set(4, 6, key)
+    c.set(4, 7, key)
+    return outlined(c, H("#FFD84A") if glow else H("#0A0A0E"))
+
+
+def alien_logo():
+    """A little green alien head for the "Restricted Access" sign."""
+    rows = [
+        "..GGGGG..",
+        ".GGGGGGG.",
+        "GGGGGGGGG",
+        "GKKGGGKKG",
+        "GKKKGKKKG",
+        ".GGGGGGG.",
+        "..GGGGG..",
+        "...GGG...",
+        "....G....",
+    ]
+    return sprite(rows, {"G": hex_color("#5BD15B"), "K": hex_color("#101018")})
+
+
+def sign_post():
+    """A plain wooden post for the campground sign."""
+    c = Canvas(4, 34)
+    H = hex_color
+    c.rect(0, 0, 4, 34, H("#7A4E2C"))
+    c.rect(0, 0, 1, 34, H("#9A6A3C"))
+    c.rect(3, 0, 4, 34, H("#5A3519"))
+    return c
+
+
+def rv():
+    """A boxy vintage camper (RV), facing left, with a striped side and a door."""
+    w, h = 76, 40
+    c = Canvas(w, h)
+    H = hex_color
+    body, body_shade, stripe, stripe2 = H("#F1EBDD"), H("#CFC6B2"), H("#D9642B"), H("#E8A43A")
+    glass, tire, hub = H("#5E8FB8"), H("#1C1C22"), H("#9AA2AE")
+    c.rect(2, 4, w - 2, 32, body)                                               # box
+    c.rect(2, 26, w - 2, 32, body_shade)
+    c.rect(2, 16, w - 2, 19, stripe)                                            # stripes
+    c.rect(2, 19, w - 2, 21, stripe2)
+    c.rect(4, 2, 24, 4, body)                                                   # cab-over roof
+    c.rect(0, 10, 3, 26, body_shade)                                            # front bumper
+    c.rect(4, 7, 16, 14, glass)                                                 # windshield
+    c.rect(26, 7, 38, 14, glass)                                                # side windows
+    c.rect(44, 7, 56, 14, glass)
+    c.rect(60, 6, 70, 30, H("#B8B0A0"))                                         # door
+    c.rect(61, 17, 63, 19, H("#5C6370"))                                        # handle
+    for x0 in (10, 52):                                                         # wheels
+        fill_ellipse(c, x0 + 5, 33, 5, 5, tire)
+        fill_ellipse(c, x0 + 5, 33, 2, 2, hub)
+    return outlined(c, H("#2A2A34"))
+
+
+def campfire(frame=0):
+    """A small campfire: crossed logs, stones, and flickering flames (two frames)."""
+    c = Canvas(16, 15)
+    H = hex_color
+    for x in range(1, 15, 3):
+        c.rect(x, 12, x + 2, 15, H("#8C939E"))                                  # stones
+    thick_line(c, 2, 13, 13, 10, 2, H("#6B4527"))                               # logs
+    thick_line(c, 2, 10, 13, 13, 2, H("#5A3519"))
+    flames = [(7, 1, 3, 10), (4, 4, 2, 9), (10, 3, 2, 9)] if frame == 0 else [(8, 2, 3, 10), (4, 3, 2, 9), (11, 5, 2, 9)]
+    for (x, top, half, bottom) in flames:
+        for y in range(top, bottom + 1):
+            spread = int(half * (y - top) / max(1, bottom - top) + 0.5)
+            for dx in range(-spread, spread + 1):
+                inner = abs(dx) < spread and y > top + 2
+                c.set(x + dx, y, H("#FFE27A") if inner else H("#F28C28"))
+    return c
+
+
+def camper(kid=False):
+    """A camper sitting in a folding camp chair, facing right, roasting a marshmallow on a stick.
+    The kid is smaller, in a blue hoodie; dad wears a red cap."""
+    base_w, base_h = 38, 32
+    s = 0.72 if kid else 1.0
+    w, h = int(base_w * s) + 1, int(base_h * s) + 1
+    c = Canvas(w, h)
+    H = hex_color
+    S = lambda v: int(round(v * s))
+    shirt = H("#3A6FC4") if kid else H("#4E7A3A")
+    pants, skin = H("#3A3F5A"), H("#F2C29B")
+    hair = H("#C88A3A") if kid else H("#5A3A22")
+    chair, chair_dark = H("#2F6E9E"), H("#1F4A6E")
+    # Chair: seat, back, and crossed legs.
+    c.rect(S(4), S(20), S(20), S(23), chair)
+    c.rect(S(3), S(9), S(6), S(23), chair_dark)
+    thick_line(c, S(5), S(23), S(17), S(31), 1, chair_dark)
+    thick_line(c, S(17), S(23), S(5), S(31), 1, chair_dark)
+    # Body: torso, lap, and shins down to the ground.
+    c.rect(S(6), S(9), S(14), S(21), shirt)
+    c.rect(S(8), S(19), S(20), S(23), pants)
+    c.rect(S(17), S(22), S(21), S(31), pants)
+    c.rect(S(17), S(30), S(23), S(32), H("#4A2C18"))                            # shoes
+    # Head.
+    c.rect(S(7), S(1), S(14), S(9), skin)
+    c.rect(S(6), S(0), S(14), S(3), hair)
+    c.set(S(12), S(4), H("#101018"))                                            # eye
+    if not kid:
+        c.rect(6, 0, 15, 2, H("#8E2420"))                                       # dad's cap
+        c.rect(13, 1, 17, 2, H("#8E2420"))
+    # Arm holding the roasting stick out over the fire, with a marshmallow on the end.
+    c.rect(S(11), S(12), S(18), S(15), shirt)
+    c.rect(S(18), S(12), S(20), S(14), skin)
+    thick_line(c, S(19), S(13), w - 3, S(8), 1, H("#8B5A2B"))
+    c.rect(w - 4, S(6), w - 1, S(9) + 1, H("#FFF6E6"))                           # marshmallow
+    return outlined(c, H("#22222C"))
+
+
+def arrow_right():
+    """A chunky orange arrow pointing right ("proceed")."""
+    c = Canvas(11, 9)
+    H = hex_color
+    orange, light = H("#F08A24"), H("#FFC66B")
+    c.rect(1, 3, 6, 6, orange)
+    c.rect(1, 3, 6, 4, light)
+    for col, half in enumerate((3, 2, 1, 0)):
+        c.rect(6 + col, 4 - half, 7 + col, 5 + half, orange)
+    return outlined(c, H("#2A1A0C"))
+
+
+def prop_mountains():
+    """A distant, hazy blue-grey mountain range with snowcaps; flat bottom sits on the horizon."""
+    w, h = 120, 34
+    c = Canvas(w, h)
+    H = hex_color
+    peaks = [(14, 8), (38, 2), (62, 12), (84, 4), (108, 10)]
+    for x in range(w):
+        # The peak that forms the silhouette here decides which face (lit or shaded) we're on.
+        owner = min(peaks, key=lambda pk: pk[1] + abs(x - pk[0]) * 0.9)
+        top = int(owner[1] + abs(x - owner[0]) * 0.9)
+        lit = x <= owner[0]
+        for y in range(max(top, 0), h):
+            depth = y - top
+            if depth < 3 and top < 14:
+                color = H("#F4F8FF") if lit else H("#D6E0EE")          # snowcap
+            else:
+                color = H("#9AA8C4") if lit else H("#7C8AA6")          # lit / shaded face
+            c.set(x, y, color)
+    # Fade the base into the haze above the hills.
+    for y in range(h - 5, h):
+        for x in range(w):
+            if c.px[y][x][3] and bayer(x, y) < (y - (h - 5)) / 5:
+                c.set(x, y, H("#A6C4DE"))
+    return c
+
+
 # MARK: - App icon
 
 APP_ICON_DIR = os.path.join(ROOT, "doveHunt", "Assets.xcassets", "AppIcon.appiconset")
@@ -1265,6 +2378,13 @@ def main():
     write_imageset("hunter", hunter().px, APP_OUTPUT_DIR)
     write_imageset("hunter_walk_a", hunter("a").px, APP_OUTPUT_DIR)
     write_imageset("hunter_walk_b", hunter("b").px, APP_OUTPUT_DIR)
+    write_imageset("hunter_look_up", hunter("look_up").px, APP_OUTPUT_DIR)
+    write_imageset("hunter_shocked", hunter("shocked").px, APP_OUTPUT_DIR)
+    write_imageset("hunter_unarmed", hunter("unarmed").px, APP_OUTPUT_DIR)
+    write_imageset("hunter_unarmed_walk_a", hunter("unarmed_a").px, APP_OUTPUT_DIR)
+    write_imageset("hunter_unarmed_walk_b", hunter("unarmed_b").px, APP_OUTPUT_DIR)
+    write_imageset("hunter_unarmed_shocked", hunter("unarmed_shocked").px, APP_OUTPUT_DIR)
+    write_imageset("hunter_stomach", hunter("stomach").px, APP_OUTPUT_DIR)
     write_imageset("feather_poof", sprite(FEATHER_POOF, SPRITE_PALETTE).px, APP_OUTPUT_DIR)
     flash = Canvas(9, 5)
     flash.stamp(MUZZLE_FLASH, GUN_PALETTE, 0, 0)
@@ -1278,6 +2398,69 @@ def main():
     write_imageset("anna", anna().px, APP_OUTPUT_DIR)
     write_imageset("anna_walk_a", anna("a").px, APP_OUTPUT_DIR)
     write_imageset("anna_walk_b", anna("b").px, APP_OUTPUT_DIR)
+    write_imageset("mallard_wings_up", bird_sprite(MALLARD_WINGS_UP, MALLARD_PALETTE).px, APP_OUTPUT_DIR)
+    write_imageset("mallard_wings_down", bird_sprite(MALLARD_WINGS_DOWN, MALLARD_PALETTE).px, APP_OUTPUT_DIR)
+    write_imageset("mallard_hit", bird_sprite(MALLARD_HIT, MALLARD_PALETTE).px, APP_OUTPUT_DIR)
+    write_imageset("prop_pine", prop_pine().px, APP_OUTPUT_DIR)
+    write_imageset("prop_mountains", prop_mountains().px, APP_OUTPUT_DIR)
+    write_imageset("prop_pond", pond().px, APP_OUTPUT_DIR)
+    write_imageset("fishing_rod", fishing_rod().px, APP_OUTPUT_DIR)
+    write_imageset("fishing_rod_short", fishing_rod(short=True).px, APP_OUTPUT_DIR)
+    write_imageset("prop_pond_small", pond(POND_SMALL_SIZE).px, APP_OUTPUT_DIR)
+    write_imageset("prop_pond_large", pond(POND_LARGE_SIZE, roundness=2.4).px, APP_OUTPUT_DIR)
+    write_imageset("tackle_box", tackle_box().px, APP_OUTPUT_DIR)
+    write_imageset("poop_drop", poop_drop().px, APP_OUTPUT_DIR)
+    write_imageset("poop_splat", poop_splat().px, APP_OUTPUT_DIR)
+    write_imageset("bear_standing", bear_standing().px, APP_OUTPUT_DIR)
+    for pose, name in (("stand", "bear_four"), ("roar", "bear_roar"), ("a", "bear_run_a"), ("b", "bear_run_b")):
+        write_imageset(name, bear_four(pose).px, APP_OUTPUT_DIR)
+    for pose in ("drink", "stand", "a", "b"):
+        write_imageset(f"deer_{pose}", deer(pose).px, APP_OUTPUT_DIR)
+        write_imageset(f"fawn_{pose}", deer(pose, fawn=True).px, APP_OUTPUT_DIR)
+    write_imageset("mallard_float", bird_sprite(MALLARD_FLOAT, MALLARD_PALETTE).px, APP_OUTPUT_DIR)
+    write_imageset("prop_stream", prop_stream().px, APP_OUTPUT_DIR)
+    write_imageset("fence_closed", chain_fence().px, APP_OUTPUT_DIR)
+    write_imageset("fence_open", chain_fence(open_gate=True).px, APP_OUTPUT_DIR)
+    write_imageset("prop_far_mountain", far_mountain().px, APP_OUTPUT_DIR)
+    write_imageset("padlock", padlock().px, APP_OUTPUT_DIR)
+    for pose, name in (("stand", "alien"), ("a", "alien_walk_a"), ("b", "alien_walk_b")):
+        write_imageset(name, alien(pose).px, APP_OUTPUT_DIR)
+    write_imageset("metal_table", metal_table().px, APP_OUTPUT_DIR)
+    write_imageset("shotgun_item", shotgun_item().px, APP_OUTPUT_DIR)
+    write_imageset("gas_puff", gas_puff().px, APP_OUTPUT_DIR)
+    for part in ("back", "front", "broken"):
+        write_imageset(f"vat_{part}", vat(part).px, APP_OUTPUT_DIR)
+    for kind in ("dove", "mallard"):
+        write_imageset(f"skeleton_{kind}", bird_skeleton(kind).px, APP_OUTPUT_DIR)
+        write_imageset(f"skeleton_{kind}_reach_a", bird_skeleton(kind, reach=True, stride=1).px, APP_OUTPUT_DIR)
+        write_imageset(f"skeleton_{kind}_reach_b", bird_skeleton(kind, reach=True, stride=-1).px, APP_OUTPUT_DIR)
+    write_imageset("clipboard", clipboard().px, APP_OUTPUT_DIR)
+    for kind in ("dove", "mallard"):
+        write_imageset(f"skeleton_{kind}_coat", bird_skeleton(kind, coat=True).px, APP_OUTPUT_DIR)
+    write_imageset("scientist_bare", alien("stand", coat=True).px, APP_OUTPUT_DIR)
+    write_imageset("hunter_scratch", hunter("scratch").px, APP_OUTPUT_DIR)
+    for pose, suffix in (("stand", ""), ("a", "_walk_a"), ("b", "_walk_b")):
+        write_imageset(f"scientist{suffix}", alien(pose, coat=True, clipboard=True).px, APP_OUTPUT_DIR)
+        write_imageset(f"scientist_scared{suffix}", alien(pose, coat=True, scared=True).px, APP_OUTPUT_DIR)
+    write_imageset("ufo_a", ufo(0).px, APP_OUTPUT_DIR)
+    write_imageset("ufo_b", ufo(1).px, APP_OUTPUT_DIR)
+    write_imageset("beam_ring", beam_ring().px, APP_OUTPUT_DIR)
+    write_imageset("prop_dirt_path", dirt_path().px, APP_OUTPUT_DIR)
+    write_imageset("padlock_glow", padlock(glow=True).px, APP_OUTPUT_DIR)
+    write_imageset("alien_logo", alien_logo().px, APP_OUTPUT_DIR)
+    write_imageset("sign_post", sign_post().px, APP_OUTPUT_DIR)
+    write_imageset("rv", rv().px, APP_OUTPUT_DIR)
+    write_imageset("campfire_a", campfire(0).px, APP_OUTPUT_DIR)
+    write_imageset("campfire_b", campfire(1).px, APP_OUTPUT_DIR)
+    write_imageset("camper_dad", camper().px, APP_OUTPUT_DIR)
+    write_imageset("camper_kid", camper(kid=True).px, APP_OUTPUT_DIR)
+    write_imageset("arrow_right", arrow_right().px, APP_OUTPUT_DIR)
+    write_imageset("arrow_down", arrow_down().px, APP_OUTPUT_DIR)
+    write_imageset("crate_icon", crate_icon().px, APP_OUTPUT_DIR)
+    for pose, name in (("stand", "fisherman"), ("a", "fisherman_run_a"), ("b", "fisherman_run_b")):
+        write_imageset(name, fisherman(pose).px, APP_OUTPUT_DIR)
+    for pose, name in (("sit", "dog_sit"), ("stand", "dog_stand"), ("a", "dog_run_a"), ("b", "dog_run_b")):
+        write_imageset(name, dog(pose).px, APP_OUTPUT_DIR)
     write_app_icon()
 
     print(f"Pixel art written to {WIDGET_OUTPUT_DIR} and {APP_OUTPUT_DIR}")

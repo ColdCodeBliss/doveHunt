@@ -42,6 +42,9 @@ enum AppArt {
     }
     static let hunter = CGSize(width: 38, height: 48)
     static let dove = CGSize(width: 16, height: 14)
+    static let mallard = CGSize(width: 19, height: 14)
+    static let pine = CGSize(width: 26, height: 50)
+    static let mountains = CGSize(width: 120, height: 34)
 
     // Adventure sprites (see the "Adventure props" section of the generator).
     static let poof = CGSize(width: 16, height: 14)
@@ -71,6 +74,82 @@ enum AppArt {
     static let anna = CGSize(width: 26, height: 48)
     static let annaBodyCenterX: CGFloat = 12
     static let annaWalkCycle = ["anna_walk_a", "anna", "anna_walk_b", "anna"]
+
+    // Pond scene (see the "Pond scene" section of the generator).
+    static let pond = CGSize(width: 52, height: 15)
+    static let fishingRod = CGSize(width: 34, height: 30)
+    /// Rod grip and tip, in rod-sprite pixels (drawn facing right).
+    static let rodGrip = CGPoint(x: 1, y: 28)
+    static let rodTip = CGPoint(x: 32, y: 1)
+    // Compact versions for narrow screens (`POND_SMALL_SIZE`, `ROD_SHORT_SIZE`).
+    static let pondSmall = CGSize(width: 34, height: 12)
+    /// The wide-screen pond (landscape phones), reaching left from the fisherman's bank.
+    static let pondLarge = CGSize(width: 88, height: 24)
+    static let fishingRodShort = CGSize(width: 20, height: 22)
+    static let rodShortGrip = CGPoint(x: 1, y: 20)
+    static let rodShortTip = CGPoint(x: 18, y: 1)
+    static let fisherman = CGSize(width: 28, height: 48)
+    /// The fisherman's hand (holding the rod) in his standing sprite, facing right.
+    static let fishermanHand = CGPoint(x: 21, y: 22)
+    static let fishermanBodyCenterX: CGFloat = 13
+    static let fishermanRunCycle = ["fisherman_run_a", "fisherman", "fisherman_run_b", "fisherman"]
+    static let dog = CGSize(width: 30, height: 24)
+    static let dogRunCycle = ["dog_run_a", "dog_stand", "dog_run_b", "dog_stand"]
+    /// Max's collar in his standing sprite, mirrored to face left (where the leash clips on).
+    static let dogCollarFacingLeft = CGPoint(x: 6, y: 10)
+    /// The fisherman's tackle box (dropped in scene 8, then kept in the inventory).
+    static let tackleBox = CGSize(width: 16, height: 12)
+    /// The bobbing "tap this" arrow.
+    static let arrowDown = CGSize(width: 9, height: 10)
+    /// The inventory button's crate.
+    static let crate = CGSize(width: 16, height: 16)
+    static let poopDrop = CGSize(width: 3, height: 4)
+    static let poopSplat = CGSize(width: 6, height: 5)
+    /// The bear reared up on its hind legs, and on all fours (`bear_four`, `bear_roar`, `bear_run_a/b`).
+    static let bearStanding = CGSize(width: 36, height: 58)
+    static let bearFour = CGSize(width: 54, height: 32)
+    static let bearRunCycle = ["bear_run_a", "bear_four", "bear_run_b", "bear_four"]
+    /// The doe and her fawn (`deer_*` / `fawn_*`: drink, stand, a, b).
+    static let deer = CGSize(width: 44, height: 40)
+    static let fawn = CGSize(width: 30, height: 28)
+    static let mallardFloat = CGSize(width: 19, height: 9)
+    static let stream = CGSize(width: 150, height: 18)
+    /// The chain-link fence (`fence_closed` / `fence_open`); its gate is the leftmost 26 px.
+    static let fence = CGSize(width: 98, height: 40)
+    /// The lone mountain behind the restricted gate; its dirt trail starts at `farMountainTrailX`.
+    static let farMountain = CGSize(width: 130, height: 76)
+    static let farMountainTrailX: CGFloat = 14
+    static let fenceGateWidth: CGFloat = 26
+    /// Where the padlock hangs on the gate's latch side (fence pixels).
+    static let fenceLock = CGPoint(x: 5, y: 21)
+    static let padlock = CGSize(width: 9, height: 10)
+    static let alienLogo = CGSize(width: 9, height: 9)
+    static let signPost = CGSize(width: 4, height: 34)
+    static let rv = CGSize(width: 76, height: 40)
+    static let campfire = CGSize(width: 16, height: 15)
+    /// Campers in camp chairs, facing right, roasting stick held out to the right.
+    static let camperDad = CGSize(width: 39, height: 33)
+    static let camperKid = CGSize(width: 28, height: 24)
+    static let arrowRight = CGSize(width: 11, height: 9)
+    /// The flying saucer (`ufo_a` / `ufo_b`, rim lights alternate) and one tractor-beam ring.
+    static let ufo = CGSize(width: 40, height: 18)
+    static let beamRing = CGSize(width: 24, height: 6)
+    /// One tile of the restricted route's dirt trail.
+    static let dirtPath = CGSize(width: 64, height: 10)
+    /// Aboard the UFO: an alien (faces right; `alien_walk_a/b`), the lab table, and the shotgun lying flat.
+    static let alien = CGSize(width: 22, height: 36)
+    static let metalTable = CGSize(width: 46, height: 22)
+    static let shotgunItem = CGSize(width: 36, height: 7)
+    /// One puff of the hunter's, er, gas.
+    static let gasPuff = CGSize(width: 14, height: 10)
+    /// The seat of the hunter's pants in his sprite (facing right), where the gas comes out.
+    static let hunterRear = CGPoint(x: 6, y: 31)
+    /// The specimen-vat lab: a vat (`vat_back` / `vat_front` / `vat_broken`), the risen bird
+    /// skeletons (`skeleton_dove*`, `skeleton_mallard*`), the scientist alien, and his clipboard.
+    static let vat = CGSize(width: 26, height: 48)
+    static let skeletonDove = CGSize(width: 18, height: 24)
+    static let skeletonMallard = CGSize(width: 22, height: 30)
+    static let clipboard = CGSize(width: 12, height: 15)
 }
 
 /// An asset-catalog sprite scaled with nearest-neighbor sampling so pixels stay crisp.
@@ -148,6 +227,8 @@ enum PixelFont {
         "#": [".#.#.", ".#.#.", "#####", ".#.#.", "#####", ".#.#.", ".#.#."],
         ">": [".#...", "..#..", "...#.", "....#", "...#.", "..#..", ".#..."],
         "<": ["...#.", "..#..", ".#...", "#....", ".#...", "..#..", "...#."],
+        "(": ["...#.", "..#..", ".#...", ".#...", ".#...", "..#..", "...#."],
+        ")": [".#...", "..#..", "...#.", "...#.", "...#.", "..#..", ".#..."],
     ]
 }
 

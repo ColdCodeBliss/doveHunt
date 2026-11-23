@@ -10,7 +10,7 @@ import SwiftUI
 /// App-only preferences and info.
 enum AppSettings {
     static let animatedDovesKey = "animatedDoves"
-    static let soundEffectsKey = "soundEffects"
+    nonisolated static let soundEffectsKey = "soundEffects"
 
     static var versionString: String {
         Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"

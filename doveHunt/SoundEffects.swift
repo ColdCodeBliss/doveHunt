@@ -8,7 +8,7 @@
 import AVFoundation
 
 /// What the hunter is walking on, which picks the footstep sound.
-enum StepSurface {
+nonisolated enum StepSurface: Sendable {
     case grass
     case wood
 
@@ -21,28 +21,41 @@ enum StepSurface {
 }
 
 /// A small pool of preloaded players per sound, so rapid shots and steps can overlap.
-final class SoundEffects {
+///
+/// All audio work (session setup, loading, priming, and playback) runs on a private serial
+/// queue. Doing it on the main thread can block the UI while the audio session activates,
+/// which Xcode reports as an "AVAudioSession Hang Risk".
+nonisolated final class SoundEffects: @unchecked Sendable {
     static let shared = SoundEffects()
 
     private static let sounds = [
-        "gunshot", "squawk",
+        "gunshot", "squawk", "quack", "quack_down", "roar", "wind", "ufo_arrive", "ufo_beam",
+        "console_beep_0", "console_beep_1", "console_beep_2", "console_beep_3",
+        "console_correct", "console_error", "console_alarm", "console_granted",
+        "gurgle", "alien_gibberish", "squeaky_fart", "glass_shatter", "alien_scream", "bone_rattle", "whistle",
         "step_grass_1", "step_grass_2", "step_grass_3",
         "step_wood_1", "step_wood_2", "step_wood_3",
     ]
     private static let voicesPerSound = 3
 
+    /// Only touched on `queue`.
+    private let queue = DispatchQueue(label: "com.ColdCodeBliss.doveHunt.sound", qos: .userInteractive)
     private var players: [String: [AVAudioPlayer]] = [:]
     private var lastStepVariant = 0
 
     private init() {
-        // Ambient: mixes with the person's music and respects the silent switch.
-        try? AVAudioSession.sharedInstance().setCategory(.ambient, mode: .default)
-        for name in Self.sounds {
-            guard let url = Bundle.main.url(forResource: name, withExtension: "wav") else { continue }
-            players[name] = (0..<Self.voicesPerSound).compactMap { _ in
-                let player = try? AVAudioPlayer(contentsOf: url)
-                player?.prepareToPlay()
-                return player
+        queue.async { [self] in
+            // Ambient: mixes with the person's music and respects the silent switch.
+            let session = AVAudioSession.sharedInstance()
+            try? session.setCategory(.ambient, mode: .default)
+            try? session.setActive(true)
+            for name in Self.sounds {
+                guard let url = Bundle.main.url(forResource: name, withExtension: "wav") else { continue }
+                players[name] = (0..<Self.voicesPerSound).compactMap { _ in
+                    let player = try? AVAudioPlayer(contentsOf: url)
+                    player?.prepareToPlay()
+                    return player
+                }
             }
         }
     }
@@ -55,13 +68,57 @@ final class SoundEffects {
 
     func squawk() { play("squawk", volume: 0.7) }
 
+    /// A mallard's first hit.
+    func quack() { play("quack", volume: 0.75) }
+
+    /// A mallard going down.
+    func quackDown() { play("quack_down", volume: 0.75) }
+
+    /// The bear's roar.
+    func roar() { play("roar", volume: 0.9) }
+
+    /// The eerie wind on the restricted route.
+    func wind() { play("wind", volume: 0.6) }
+
+    /// The UFO swooping in, and its tractor beam.
+    func ufoArrive() { play("ufo_arrive", volume: 0.8) }
+    func ufoBeam() { play("ufo_beam", volume: 0.8) }
+
+    /// The alien console: a tone per grid row, and its feedback sounds.
+    func consoleBeep(row: Int) { play("console_beep_\(min(max(row, 0), 3))", volume: 0.55) }
+    func consoleCorrect() { play("console_correct", volume: 0.6) }
+    func consoleError() { play("console_error", volume: 0.7) }
+    func consoleAlarm() { play("console_alarm", volume: 0.6) }
+    func consoleGranted() { play("console_granted", volume: 0.65) }
+
+    /// Aboard the UFO: the hunter's stomach, alien chatter, and an untimely toot.
+    func gurgle() { play("gurgle", volume: 0.85) }
+    func alienGibberish() { play("alien_gibberish", volume: 0.7) }
+    func squeakyFart() { play("squeaky_fart", volume: 0.75) }
+
+    /// The specimen-vat lab: shattering glass, a scientist's scream, and rattling bones.
+    func glassShatter() { play("glass_shatter", volume: 0.8) }
+    func alienScream() { play("alien_scream", volume: 0.75) }
+    func boneRattle() { play("bone_rattle", volume: 0.7) }
+
+    /// The hunter's carefree whistle.
+    func whistle() { play("whistle", volume: 0.6) }
+
     /// One footstep, cycling through the variants so a walk doesn't sound mechanical.
     func step(on surface: StepSurface) {
-        lastStepVariant = lastStepVariant % 3 + 1
-        play("\(surface.soundPrefix)_\(lastStepVariant)", volume: 0.45)
+        let prefix = surface.soundPrefix
+        queue.async { [self] in
+            lastStepVariant = lastStepVariant % 3 + 1
+            playNow("\(prefix)_\(lastStepVariant)", volume: 0.45)
+        }
     }
 
     private func play(_ name: String, volume: Float) {
+        queue.async { [self] in playNow(name, volume: volume) }
+    }
+
+    /// Must be called on `queue`.
+    private func playNow(_ name: String, volume: Float) {
         guard isEnabled, let voices = players[name], !voices.isEmpty else { return }
         let player = voices.first { !$0.isPlaying } ?? voices[0]
         player.volume = volume
