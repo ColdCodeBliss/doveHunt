@@ -93,6 +93,8 @@ struct AdventureScene {
     var hasForkEvent = false
     /// The campsite: an RV, a campfire, and a dad and kid roasting marshmallows.
     var hasCampsiteEvent = false
+    /// The hunter's own camp: a tent, a cold fire pit, a chair, and supplies; he turns in for the night.
+    var hasOwnCampEvent = false
     /// The restricted route: night, a dirt trail, and an eerie wind.
     var isEerie = false
     /// The UFO abduction.
@@ -282,13 +284,14 @@ enum AdventureScenes {
             ],
             hasCampsiteEvent: true
         ),
-        // More to come.
+        // The hunter's own camp: he turns in for the night.
         AdventureScene(
             doves: [],
             props: [
-                AdventureProp(kind: .bush, fractionX: 0.3),
-                AdventureProp(kind: .pine, fractionX: 0.9),
-            ]
+                AdventureProp(kind: .pine, fractionX: 0.08),
+                AdventureProp(kind: .pine, fractionX: 0.94),
+            ],
+            hasOwnCampEvent: true
         ),
     ]
 
@@ -580,6 +583,14 @@ final class AdventureGame {
         case wreckedLab(start: Date)
         /// A pristine lab: the scientist in a vat, the skeletons in lab coats; the hunter leaves the clipboard.
         case pristineLab(start: Date)
+        /// The UFO's restrooms: a pressing visit, and two angry aliens carry him out.
+        case restroom(start: Date)
+        /// Back on the night trail: the UFO lowers the hunter down its beam and flies off.
+        case dropOff(start: Date)
+        /// Back at the fork: he comes out through the gate, which shuts and locks behind him.
+        case forkReturn(start: Date)
+        /// At his own camp: into the tent, and lights out.
+        case ownCamp(start: Date)
         /// End of the content so far: fade to "TO BE CONTINUED...".
         case finished(start: Date)
     }
@@ -823,29 +834,33 @@ final class AdventureGame {
     enum VatTiming {
         static let fadeIn: TimeInterval = 0.8
         static let walkInDuration: TimeInterval = 2.0
-        /// On instinct, he shoots the dove's vat, then the mallard's.
-        static let firstShot: TimeInterval = 2.6
-        static let secondShot: TimeInterval = 3.4
+        /// He stops dead at the sight of the vats, wide-eyed...
+        static let stunnedEnds: TimeInterval = 3.0
+        /// ...then levels his shotgun at them and, on instinct, shoots the dove's vat, then the mallard's.
+        static let aimStarts: TimeInterval = 3.0
+        static let firstShot: TimeInterval = 3.6
+        static let secondShot: TimeInterval = 4.4
+        static let aimEnds: TimeInterval = 5.0
         static let liquidFall: TimeInterval = 0.45
         static let birdFall: TimeInterval = 0.4
         /// A scientist runs in with his clipboard.
-        static let scientistArrives: TimeInterval = 4.6
+        static let scientistArrives: TimeInterval = 5.6
         static let scientistArriveDuration: TimeInterval = 1.0
         /// The birds rise as skeletons and turn on him.
-        static let transform: TimeInterval = 6.0
-        static let shockedStarts: TimeInterval = 6.0
-        static let shockedEnds: TimeInterval = 8.4
+        static let transform: TimeInterval = 7.0
+        static let shockedStarts: TimeInterval = 7.0
+        static let shockedEnds: TimeInterval = 9.4
         /// He drops the clipboard and screams.
-        static let drop: TimeInterval = 6.6
+        static let drop: TimeInterval = 7.6
         static let clipboardFall: TimeInterval = 0.35
-        static let screamShows: TimeInterval = 6.6
-        static let screamHides: TimeInterval = 8.0
-        static let reachStarts: TimeInterval = 7.0
-        static let scientistFlees: TimeInterval = 8.0
+        static let screamShows: TimeInterval = 7.6
+        static let screamHides: TimeInterval = 9.0
+        static let reachStarts: TimeInterval = 8.0
+        static let scientistFlees: TimeInterval = 9.0
         static let scientistFleeDuration: TimeInterval = 1.2
-        static let chaseStarts: TimeInterval = 8.4
+        static let chaseStarts: TimeInterval = 9.4
         static let chaseDuration: TimeInterval = 2.4
-        static let waiting: TimeInterval = 11.0
+        static let waiting: TimeInterval = 12.0
         /// After the pickup: the bubble, then he walks off to the right and it fades.
         static let collectedShows: TimeInterval = 2.0
         static let leaveDuration: TimeInterval = 2.2
@@ -877,7 +892,8 @@ final class AdventureGame {
         /// The scientist in the vat says something alien.
         static let chatterShows: TimeInterval = 3.2
         static let chatterHides: TimeInterval = 5.2
-        /// He puts his shotgun away and carries the clipboard to the table, whistling.
+        /// He puts his shotgun away and carries the clipboard to the table; once it's down he
+        /// whistles as he walks off.
         static let clipboardOut: TimeInterval = 5.6
         static let toTableStarts: TimeInterval = 5.8
         static let toTableDuration: TimeInterval = 1.8
@@ -890,6 +906,97 @@ final class AdventureGame {
         static let done: TimeInterval = 11.2
     }
 
+    /// The restroom corridor (seconds from the start of the scene).
+    enum RestroomTiming {
+        static let fadeIn: TimeInterval = 0.8
+        static let walkInDuration: TimeInterval = 2.0
+        /// His stomach again.
+        static let stomachStarts: TimeInterval = 2.2
+        static let stomachEnds: TimeInterval = 4.0
+        /// Into the men's room.
+        static let toDoorStarts: TimeInterval = 4.2
+        static let toDoorDuration: TimeInterval = 1.2
+        static let doorOpens: TimeInterval = 5.2
+        static let enters: TimeInterval = 5.5
+        static let blackStarts: TimeInterval = 5.8
+        static let blackFade: TimeInterval = 0.6
+        /// In the dark: two toots, a splash, and a big finale.
+        static let firstFart: TimeInterval = 6.8
+        static let secondFart: TimeInterval = 7.8
+        static let splash: TimeInterval = 8.8
+        static let lastFart: TimeInterval = 9.8
+        /// Back in the corridor: two angry aliens either side of him.
+        static let backStarts: TimeInterval = 11.2
+        static let backFade: TimeInterval = 0.8
+        static let cursingShows: TimeInterval = 12.4
+        static let cursingHides: TimeInterval = 13.8
+        /// They pick him up and carry him out.
+        static let pickup: TimeInterval = 14.0
+        static let pickupDuration: TimeInterval = 0.5
+        static let carryStarts: TimeInterval = 14.8
+        static let carryDuration: TimeInterval = 2.4
+        static let fadeOutStarts: TimeInterval = 16.6
+        static let fadeOutDuration: TimeInterval = 1.0
+        static let done: TimeInterval = 17.8
+    }
+
+    /// The drop-off on the night trail (seconds from the start of the scene).
+    enum DropOffTiming {
+        static let fadeIn: TimeInterval = 1.0
+        static let ufoArrives: TimeInterval = 0.6
+        static let ufoArriveDuration: TimeInterval = 2.0
+        static let beamStarts: TimeInterval = 2.8
+        static let beamEnds: TimeInterval = 5.4
+        /// He floats down the beam, fading in, and lands.
+        static let lowerStarts: TimeInterval = 3.0
+        static let lowerDuration: TimeInterval = 2.0
+        /// The UFO flies off; he looks up after it.
+        static let ufoLeaves: TimeInterval = 5.8
+        static let ufoLeaveDuration: TimeInterval = 1.4
+        static let lookUpEnds: TimeInterval = 7.6
+        /// Then he looks left, then right, scratching his head.
+        static let scratchLeftStarts: TimeInterval = 7.8
+        static let scratchRightStarts: TimeInterval = 8.6
+        static let scratchEnds: TimeInterval = 9.4
+        static let fadeOutStarts: TimeInterval = 9.6
+        static let fadeOutDuration: TimeInterval = 1.0
+        static let done: TimeInterval = 10.8
+    }
+
+    /// Back at the fork (seconds from the start of the scene).
+    enum ForkReturnTiming {
+        static let fadeIn: TimeInterval = 0.8
+        /// He steps out through the open gate, toward us.
+        static let emergeStarts: TimeInterval = 0.4
+        static let emergeDuration: TimeInterval = 1.4
+        /// The gate swings shut and the lock snaps back on.
+        static let gateCloses: TimeInterval = 2.2
+        static let remarkShows: TimeInterval = 2.8
+        static let remarkHides: TimeInterval = 5.0
+        static let done: TimeInterval = 5.2
+    }
+
+    /// The hunter's own camp (seconds from the start of the scene).
+    enum OwnCampTiming {
+        static let toTentStarts: TimeInterval = 0.4
+        static let toTentDuration: TimeInterval = 2.2
+        /// He ducks inside, and the lights go out.
+        static let entersStarts: TimeInterval = 2.6
+        static let entersDuration: TimeInterval = 0.4
+        static let blackStarts: TimeInterval = 3.0
+        static let blackDuration: TimeInterval = 1.0
+        /// "ZzZzzZzz", a letter at a time, with snoring.
+        static let snoreStarts: TimeInterval = 4.4
+        static let zPerLetter: TimeInterval = 0.25
+        static let done: TimeInterval = 10.8
+    }
+
+    static let forkReturnRemark = "Time to hit the sack."
+    static let snoring = "ZzZzzZzz"
+
+    /// What the angry aliens say.
+    static let alienCursing = ["#!?#!", "!#?!"]
+
     static let scientistScream = "EEEEEEEK!"
     static let vatAlienChatter = "<#: /#> (:#"
 
@@ -897,7 +1004,7 @@ final class AdventureGame {
     static let bathroomRemark = "I hope they have a bathroom on this thing, that pickle sandwich is fighting back.."
     /// What the aliens say: alien-looking symbols in the pixel font, then plain English.
     static let alienChatter = ["#<:/ >#( :/#<", "/#> <:#/ (#: >#"]
-    static let alienManners = "Seriously man, manners?"
+    static let alienManners = "Seriously dude, manners?"
     static let alienNice = "Nice."
 
     static let smokeyRemark = "Wow, Smokey Bear put on some weight.."
@@ -970,6 +1077,8 @@ final class AdventureGame {
     private(set) var hasShotgun = true
     /// The inventory was opened for a pickup, and the scene moves on once it's closed.
     private var continuesWhenInventoryCloses = false
+    /// Back at the fork after the UFO: he starts from the gate, not the left edge.
+    private(set) var returnedToFork = false
 
     /// Every scene on this run's path: the main trail, then the chosen route's scenes.
     var sceneCount: Int { AdventureScenes.all.count + (route?.scenes.count ?? 0) }
@@ -1185,16 +1294,18 @@ final class AdventureGame {
         finishesFromBlack = false
         hasShotgun = true
         continuesWhenInventoryCloses = false
+        returnedToFork = false
         inventory = []
     }
 
     #if DEBUG
     /// Jumps straight to a scene, for previews.
-    static func preview(scene: Int, phase: Phase = .hunting, cabinVisited: Bool = false, pondDovesOut: Bool = false, inventory: [InventoryItem] = [], route: QuestRoute? = nil, console: ConsoleState? = nil) -> AdventureGame {
+    static func preview(scene: Int, phase: Phase = .hunting, cabinVisited: Bool = false, pondDovesOut: Bool = false, inventory: [InventoryItem] = [], route: QuestRoute? = nil, console: ConsoleState? = nil, night: Bool = false) -> AdventureGame {
         let game = AdventureGame()
         game.route = route
         if let console { game.console = console }
-        game.isNight = route == .restricted && scene > 12
+        game.isNight = night || (route == .restricted && scene > 12)
+        game.returnedToFork = night && route == .campground
         game.scene = scene
         game.phase = phase
         game.cabinVisited = cabinVisited || scene > 2
@@ -1287,6 +1398,8 @@ final class AdventureGame {
             phase = .campsite(start: Date())
         } else if next.hasAbductionEvent {
             beginAbduction()
+        } else if next.hasOwnCampEvent {
+            beginOwnCamp()
         } else {
             phase = .hunting
             if next.doves.isEmpty {
@@ -1539,12 +1652,62 @@ final class AdventureGame {
         phase = .pristineLab(start: Date())
         playFootsteps(for: PristineTiming.walkInDuration, on: .wood)
         after(PristineTiming.chatterShows) { $0.sounds.alienGibberish() }
-        after(PristineTiming.toTableStarts) { $0.sounds.whistle() }
         playFootsteps(for: PristineTiming.toTableDuration, on: .wood, after: PristineTiming.toTableStarts)
-        // He leaves the clipboard on the table.
-        after(PristineTiming.place) { game in game.inventory.removeAll { $0 == .clipboard } }
+        // He leaves the clipboard on the table, and whistles a happy tune as he walks off.
+        after(PristineTiming.place) { game in
+            game.inventory.removeAll { $0 == .clipboard }
+            game.sounds.whistle()
+        }
         playFootsteps(for: PristineTiming.walkOffDuration, on: .wood, after: PristineTiming.walkOffStarts)
-        after(PristineTiming.done) { game in
+        after(PristineTiming.done) { $0.beginRestroom() }
+    }
+
+    // MARK: Restroom and drop-off
+
+    private func beginRestroom() {
+        phase = .restroom(start: Date())
+        playFootsteps(for: RestroomTiming.walkInDuration, on: .wood)
+        after(RestroomTiming.stomachStarts) { $0.sounds.gurgle() }
+        playFootsteps(for: RestroomTiming.toDoorDuration, on: .wood, after: RestroomTiming.toDoorStarts)
+        after(RestroomTiming.firstFart) { $0.sounds.squeakyFart() }
+        after(RestroomTiming.secondFart) { $0.sounds.squeakyFart() }
+        after(RestroomTiming.splash) { $0.sounds.waterSplash() }
+        after(RestroomTiming.lastFart) { $0.sounds.bigFart() }
+        playFootsteps(for: RestroomTiming.carryDuration, on: .wood, after: RestroomTiming.carryStarts)
+        after(RestroomTiming.done) { $0.beginDropOff() }
+    }
+
+    /// Back on the night trail where he was taken (the UFO scene).
+    private func beginDropOff() {
+        phase = .dropOff(start: Date())
+        sounds.wind()
+        after(DropOffTiming.ufoArrives) { $0.sounds.ufoArrive() }
+        after(DropOffTiming.beamStarts) { $0.sounds.ufoBeam() }
+        after(DropOffTiming.ufoLeaves) { $0.sounds.ufoArrive() }
+        after(DropOffTiming.done) { $0.beginForkReturn() }
+    }
+
+    /// Back at the fork, on the campground route now: out through the gate, which locks behind him.
+    private func beginForkReturn() {
+        route = .campground
+        scene = AdventureScenes.all.firstIndex { $0.hasForkEvent } ?? scene
+        returnedToFork = true
+        poofs = []
+        dovesReleased = nil
+        phase = .forkReturn(start: Date())
+        playFootsteps(for: ForkReturnTiming.emergeDuration, on: .grass, after: ForkReturnTiming.emergeStarts)
+        after(ForkReturnTiming.gateCloses) { $0.sounds.gateClank() }
+        after(ForkReturnTiming.done) { game in
+            game.phase = .hunting
+            game.startWalking()
+        }
+    }
+
+    private func beginOwnCamp() {
+        phase = .ownCamp(start: Date())
+        playFootsteps(for: OwnCampTiming.toTentDuration, on: .grass, after: OwnCampTiming.toTentStarts)
+        after(OwnCampTiming.snoreStarts) { $0.sounds.snore() }
+        after(OwnCampTiming.done) { game in
             game.finishesFromBlack = true
             game.phase = .hunting
             game.finish()

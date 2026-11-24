@@ -150,6 +150,15 @@ enum AppArt {
     static let skeletonDove = CGSize(width: 18, height: 24)
     static let skeletonMallard = CGSize(width: 22, height: 30)
     static let clipboard = CGSize(width: 12, height: 15)
+    /// The muzzle of the shotgun in `hunter_aim` (held level), in sprite pixels.
+    static let hunterAimMuzzle = CGPoint(x: 38, y: 18)
+    /// The hunter's camp.
+    static let tent = CGSize(width: 56, height: 36)
+    static let firepitUnlit = CGSize(width: 18, height: 9)
+    static let campChair = CGSize(width: 18, height: 18)
+    static let foldingTable = CGSize(width: 28, height: 20)
+    static let backpack = CGSize(width: 12, height: 15)
+    static let cooler = CGSize(width: 16, height: 11)
 }
 
 /// An asset-catalog sprite scaled with nearest-neighbor sampling so pixels stay crisp.

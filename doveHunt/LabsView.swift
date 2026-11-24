@@ -245,10 +245,10 @@ struct PristineLabView: View {
                 ufoBubble(AdventureGame.vatAlienChatter, anchor: CGPoint(x: vatX, y: vatTop - 4 * s), screen: screen,
                           color: Color(red: 0.49, green: 1, blue: 0.49))
             }
-            // Musical notes while he whistles.
-            if t >= Timing.toTableStarts, t < Timing.place + 0.4 {
+            // Musical notes while he whistles, from setting the clipboard down until he's gone.
+            if t >= Timing.place {
                 ForEach(0..<2, id: \.self) { i in
-                    let p = ((t - Timing.toTableStarts) * 0.9 + Double(i) * 0.5).truncatingRemainder(dividingBy: 1)
+                    let p = ((t - Timing.place) * 0.9 + Double(i) * 0.5).truncatingRemainder(dividingBy: 1)
                     MusicNote(pixel: s)
                         .fill(Color.pixelCream)
                         .frame(width: 5 * s, height: 7 * s)

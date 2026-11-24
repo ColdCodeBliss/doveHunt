@@ -59,6 +59,8 @@ struct AdventureView: View {
                     WreckedLabView(screen: screen, now: now, start: start)
                 } else if case .pristineLab(let start) = game.phase {
                     PristineLabView(screen: screen, now: now, start: start)
+                } else if case .restroom(let start) = game.phase {
+                    RestroomView(screen: screen, now: now, start: start)
                 } else {
                 ZStack(alignment: .topLeading) {
                     background(art: art, world: world, camera: frame.camera)
@@ -92,6 +94,8 @@ struct AdventureView: View {
                             forkCast(sceneIndex: sceneIndex, world: world, frame: frame, time: time, now: now)
                         } else if spec.hasCampsiteEvent {
                             campsiteCast(sceneIndex: sceneIndex, world: world, frame: frame, time: time, now: now)
+                        } else if spec.hasOwnCampEvent {
+                            ownCampCast(sceneIndex: sceneIndex, world: world, frame: frame)
                         }
                     }
 
@@ -126,11 +130,17 @@ struct AdventureView: View {
                     if case .abduction(let start) = game.phase {
                         abductionCast(world: world, frame: frame, now: now, start: start, rings: false)
                     }
+                    if case .dropOff(let start) = game.phase {
+                        dropOffCast(world: world, frame: frame, now: now, start: start, rings: false)
+                    }
 
                     hunter(world: world, frame: frame)
 
                     if case .abduction(let start) = game.phase {
                         abductionCast(world: world, frame: frame, now: now, start: start, rings: true)
+                    }
+                    if case .dropOff(let start) = game.phase {
+                        dropOffCast(world: world, frame: frame, now: now, start: start, rings: true)
                     }
 
                     // A gusting wind whenever the restricted route is on screen.
@@ -154,6 +164,25 @@ struct AdventureView: View {
                     Color.black
                         .opacity(frame.blackout)
                         .allowsHitTesting(false)
+
+                    // Lights out in the tent: snoring, a letter at a time.
+                    if case .ownCamp(let start) = game.phase, now.timeIntervalSince(start) >= AdventureGame.OwnCampTiming.snoreStarts {
+                        let letters = min(AdventureGame.snoring.count, Int((now.timeIntervalSince(start) - AdventureGame.OwnCampTiming.snoreStarts) / AdventureGame.OwnCampTiming.zPerLetter) + 1)
+                        let big: CGFloat = screen.width >= 700 ? 6 : 5
+                        let clock = now.timeIntervalSinceReferenceDate
+                        // The pixel font is all capitals, so the small z's are just smaller Z's,
+                        // each bobbing at its own height.
+                        HStack(alignment: .bottom, spacing: big) {
+                            ForEach(Array(AdventureGame.snoring.prefix(letters).enumerated()), id: \.offset) { index, letter in
+                                let isCapital = letter.isUppercase
+                                PixelText("Z", pixelSize: isCapital ? big : big * 0.5, scalesWithDynamicType: false)
+                                    .offset(y: (sin(clock * 2 + Double(index) * 0.8) * 4).rounded() - (isCapital ? 0 : big * 4))
+                            }
+                        }
+                        .frame(width: screen.width, height: screen.height)
+                        .allowsHitTesting(false)
+                        .accessibilityLabel("Snoring")
+                    }
 
                     if case .finished(let start) = game.phase, now.timeIntervalSince(start) >= 1 {
                         toBeContinued(time: now.timeIntervalSinceReferenceDate, screenWidth: screen.width)
@@ -537,6 +566,60 @@ struct AdventureView: View {
         }
     }
 
+    /// The drop-off: the UFO swoops back in, lowers the hunter down its green beam, and flies off.
+    @ViewBuilder
+    private func dropOffCast(world: AdventureWorld, frame: AdventureFrame, now: Date, start: Date, rings: Bool) -> some View {
+        let t = max(0, now.timeIntervalSince(start))
+        let hover = CGPoint(x: frame.camera + (world.sceneWidth / 2).rounded(), y: AppArt.groundTop - 100)
+        let flyIn = min(max((t - AdventureGame.DropOffTiming.ufoArrives) / AdventureGame.DropOffTiming.ufoArriveDuration, 0), 1)
+        let eased = 1 - (1 - flyIn) * (1 - flyIn)
+        let entry = CGPoint(x: frame.camera + world.sceneWidth + 50, y: AppArt.groundTop - 160)
+        let leave = min(max((t - AdventureGame.DropOffTiming.ufoLeaves) / AdventureGame.DropOffTiming.ufoLeaveDuration, 0), 1)
+        let leaveEased = leave * leave
+        let bob: CGFloat = flyIn >= 1 && leave == 0 ? (sin(t * 3) * 2).rounded() : 0
+        let arrivedX = entry.x + (hover.x - entry.x) * eased
+        let arrivedY = entry.y + (hover.y - entry.y) * eased
+        // It leaves the way it went last time: off to the left, climbing.
+        let exitX = frame.camera - 60
+        let ufo = CGPoint(x: (arrivedX + (exitX - arrivedX) * leaveEased).rounded(), y: (arrivedY - 30 * leaveEased).rounded() + bob)
+        let beamTop = ufo.y + AppArt.ufo.height / 2 - 2
+        let ground = AppArt.groundTop + 3
+        let beaming = t >= AdventureGame.DropOffTiming.beamStarts && t < AdventureGame.DropOffTiming.beamEnds
+
+        if !rings {
+            if beaming {
+                let glow = 0.16 + 0.08 * sin(t * 9)
+                let top = world.point(ufo.x, beamTop, camera: frame.camera)
+                let bottom = world.point(ufo.x, ground, camera: frame.camera)
+                Path { path in
+                    path.move(to: CGPoint(x: top.x - 6 * world.scale, y: top.y))
+                    path.addLine(to: CGPoint(x: top.x + 6 * world.scale, y: top.y))
+                    path.addLine(to: CGPoint(x: bottom.x + 18 * world.scale, y: bottom.y))
+                    path.addLine(to: CGPoint(x: bottom.x - 18 * world.scale, y: bottom.y))
+                    path.closeSubpath()
+                }
+                .fill(Color(red: 0.49, green: 1, blue: 0.49).opacity(glow))
+                .allowsHitTesting(false)
+            }
+            if flyIn > 0, leave < 1 {
+                AppSprite(name: Int(t * 4).isMultiple(of: 2) ? "ufo_a" : "ufo_b", size: AppArt.ufo, scale: world.scale)
+                    .position(world.point(ufo.x, ufo.y, camera: frame.camera))
+                    .allowsHitTesting(false)
+            }
+        } else if beaming {
+            // The same rings as the abduction, sliding down the beam as he floats down it.
+            ForEach(0..<6, id: \.self) { index in
+                let progress = ((t - AdventureGame.DropOffTiming.beamStarts) * 0.9 + Double(index) / 6).truncatingRemainder(dividingBy: 1)
+                let y = beamTop + (ground - beamTop) * progress
+                AppSprite(name: "beam_ring", size: AppArt.beamRing, scale: world.scale)
+                    .scaleEffect(x: 0.5 + 1.0 * progress, y: 1)
+                    .opacity(0.9 - 0.4 * progress)
+                    .position(world.point(ufo.x, y.rounded(), camera: frame.camera))
+            }
+            .allowsHitTesting(false)
+        }
+    }
+
     /// The dusk tint: a warm, darkening gradient multiplied over the sky and scenery.
     private func dusk(amount: Double) -> some View {
         LinearGradient(
@@ -687,7 +770,12 @@ struct AdventureView: View {
         let locked: Bool = { if case .fork(.locked, _) = phase { return true } else { return false } }()
         let sinceShot = shotAt.map { now.timeIntervalSince($0) }
         // The gate stays open once the lock is shot (and for the rest of the run on this route).
-        let gateOpen = (sinceShot.map { $0 >= AdventureGame.ForkTiming.gateOpens } ?? false) || (game.route == .restricted && sceneIndex < game.scene)
+        let returningAt: Date? = { if case .forkReturn(let start) = phase { return start } else { return nil } }()
+        let sinceReturn = returningAt.map { now.timeIntervalSince($0) }
+        // Open as he comes back out, until it swings shut behind him.
+        let gateOpen = (sinceShot.map { $0 >= AdventureGame.ForkTiming.gateOpens } ?? false)
+            || (game.route == .restricted && sceneIndex < game.scene)
+            || (sinceReturn.map { $0 < AdventureGame.ForkReturnTiming.gateCloses } ?? false)
         let fenceTop = ForkLayout.fenceTop
         let pixel: CGFloat = 2
 
@@ -757,6 +845,10 @@ struct AdventureView: View {
             .accessibilityAddTraits(.isButton)
             .accessibilityAction { if choosing { game.choosePath(.campground) } }
 
+        if let sinceReturn, sinceReturn >= AdventureGame.ForkReturnTiming.remarkShows, sinceReturn < AdventureGame.ForkReturnTiming.remarkHides {
+            speech(AdventureGame.forkReturnRemark, anchor: world.point(frame.hunterLeft + AppArt.hunterBodyCenterX, AppArt.groundTop + 3 - AppArt.hunter.height, camera: frame.camera), screen: world.screen)
+        }
+
         if choosing {
             // The fence itself also picks the restricted path.
             Color.clear
@@ -811,6 +903,26 @@ struct AdventureView: View {
                 .accessibilityAddTraits(.isButton)
                 .accessibilityAction { game.leaveCampsite() }
         }
+    }
+
+    /// The hunter's camp: his tent, a cold fire pit, an empty camp chair, a fold-out table with a
+    /// lantern and supplies, his backpack, and a cooler.
+    private func ownCampCast(sceneIndex: Int, world: AdventureWorld, frame: AdventureFrame) -> some View {
+        let layout = OwnCampLayout(sceneWidth: world.sceneWidth)
+        let origin = world.sceneOrigin(sceneIndex)
+        let standing = { (name: String, size: CGSize, x: CGFloat, sink: CGFloat) in
+            AppSprite(name: name, size: size, scale: world.scale)
+                .position(world.point(origin + x, AppArt.groundTop + sink - size.height / 2, camera: frame.camera))
+        }
+        return ZStack(alignment: .topLeading) {
+            standing("tent", AppArt.tent, layout.tentX, 3)
+            standing("cooler", AppArt.cooler, layout.coolerX, 3)
+            standing("camp_chair", AppArt.campChair, layout.chairX, 3)
+            standing("firepit_unlit", AppArt.firepitUnlit, layout.fireX, 4)
+            standing("folding_table", AppArt.foldingTable, layout.tableX, 3)
+            standing("backpack", AppArt.backpack, layout.backpackX, 3)
+        }
+        .allowsHitTesting(false)
     }
 
     /// A timed speech bubble (no tap needed) above `anchor`.
@@ -921,6 +1033,7 @@ struct AdventureView: View {
         let top = AppArt.groundTop + 3 - size.height - frame.hunterLift
         return ZStack {
             AppSprite(name: frame.hunterSprite, size: size, scale: world.scale)
+                .scaleEffect(x: frame.hunterFacesLeft ? -1 : 1)
                 .position(world.point(frame.hunterLeft + size.width / 2, top + size.height / 2, camera: frame.camera))
 
             if game.isFiring {
@@ -1057,13 +1170,15 @@ struct AdventureFrame {
     var hunterOpacity: Double = 1
     /// How far the hunter is lifted off the ground (being beamed up), in art pixels.
     var hunterLift: CGFloat = 0
+    /// The hunter turned around to face left.
+    var hunterFacesLeft = false
     var doorOpen = false
     var blackout: Double = 0
 
     init(game: AdventureGame, now: Date, sceneWidth: CGFloat, scale: CGFloat) {
         let restCamera = CGFloat(game.scene) * sceneWidth
         camera = restCamera
-        let restOffset = Self.restOffset(game: game, scene: game.scene, sceneWidth: sceneWidth)
+        let restOffset = Self.restOffset(game: game, scene: game.scene, sceneWidth: sceneWidth, scale: scale)
         hunterLeft = restCamera + restOffset
         if let fadeStart = game.fadeInStart {
             blackout = max(0, 1 - now.timeIntervalSince(fadeStart) / AdventureGame.fadeInDuration)
@@ -1080,8 +1195,8 @@ struct AdventureFrame {
             let elapsed = max(0, now.timeIntervalSince(start))
             let progress = min(elapsed / AdventureGame.walkDuration, 1)
             let origin = CGFloat(from) * sceneWidth
-            let startOffset = Self.restOffset(game: game, scene: from, sceneWidth: sceneWidth)
-            let endOffset = Self.restOffset(game: game, scene: from + 1, sceneWidth: sceneWidth)
+            let startOffset = Self.restOffset(game: game, scene: from, sceneWidth: sceneWidth, scale: scale)
+            let endOffset = Self.restOffset(game: game, scene: from + 1, sceneWidth: sceneWidth, scale: scale)
             hunterLeft = (origin + startOffset + (sceneWidth + endOffset - startOffset) * progress).rounded()
             camera = (origin + sceneWidth * progress - 0.3 * sceneWidth * sin(.pi * progress)).rounded()
             hunterSprite = Self.walkFrame(elapsed: elapsed)
@@ -1118,8 +1233,54 @@ struct AdventureFrame {
             hunterOpacity = 1 - min(max((lift - 0.55) / 0.45, 0), 1)
             blackout = min(max((t - AdventureGame.AbductionTiming.fadeStarts) / AdventureGame.AbductionTiming.fadeDuration, 0), 1)
 
-        case .console, .aboard, .aliens, .vats, .wreckedLab, .pristineLab:
+        case .console, .aboard, .aliens, .vats, .wreckedLab, .pristineLab, .restroom:
             blackout = 1
+
+        case .dropOff(let start):
+            // Lowered down the beam in the middle of the trail, fading in, then a look up at the
+            // departing UFO.
+            typealias Timing = AdventureGame.DropOffTiming
+            let t = max(0, now.timeIntervalSince(start))
+            hunterLeft = restCamera + (sceneWidth / 2).rounded() - AppArt.hunterBodyCenterX
+            let lower = min(max((t - Timing.lowerStarts) / Timing.lowerDuration, 0), 1)
+            let eased = 1 - (1 - lower) * (1 - lower)
+            hunterLift = (46 * (1 - eased)).rounded()
+            hunterOpacity = min(max((t - Timing.lowerStarts) / 0.6, 0), 1)
+            if t >= Timing.ufoLeaves, t < Timing.lookUpEnds { hunterSprite = "hunter_look_up" }
+            // Then a look left and right, scratching his head: where on earth is he?
+            if t >= Timing.scratchLeftStarts, t < Timing.scratchEnds {
+                hunterSprite = "hunter_scratch"
+                hunterFacesLeft = t < Timing.scratchRightStarts
+            }
+            blackout = max(max(0, 1 - t / Timing.fadeIn), min(max((t - Timing.fadeOutStarts) / Timing.fadeOutDuration, 0), 1))
+
+        case .forkReturn(let start):
+            // Out through the open gate, walking toward us and to the left, then turning around.
+            typealias Timing = AdventureGame.ForkReturnTiming
+            let layout = ForkLayout(sceneWidth: sceneWidth, scale: scale)
+            let t = max(0, now.timeIntervalSince(start))
+            let emerge = min(max((t - Timing.emergeStarts) / Timing.emergeDuration, 0), 1)
+            let through = restCamera + layout.hunterThroughGate
+            let atGate = restCamera + layout.hunterAtGate
+            hunterLeft = (through + (atGate - through) * emerge).rounded()
+            hunterOpacity = min(max((t - Timing.emergeStarts) / 0.5, 0), 1)
+            if emerge > 0, emerge < 1 {
+                hunterSprite = Self.walkFrame(elapsed: t)
+                hunterFacesLeft = true
+            }
+            blackout = max(0, 1 - t / Timing.fadeIn)
+
+        case .ownCamp(let start):
+            // Over to the tent, inside, and lights out.
+            typealias Timing = AdventureGame.OwnCampTiming
+            let layout = OwnCampLayout(sceneWidth: sceneWidth)
+            let t = max(0, now.timeIntervalSince(start))
+            let walk = min(max((t - Timing.toTentStarts) / Timing.toTentDuration, 0), 1)
+            let door = restCamera + layout.tentX - AppArt.hunterBodyCenterX
+            hunterLeft = (restCamera + restOffset + (door - restCamera - restOffset) * walk).rounded()
+            if walk > 0, walk < 1 { hunterSprite = Self.walkFrame(elapsed: t) }
+            hunterOpacity = 1 - min(max((t - Timing.entersStarts) / Timing.entersDuration, 0), 1)
+            blackout = min(max((t - Timing.blackStarts) / Timing.blackDuration, 0), 1)
 
         case .bear(let start):
             // A wide-eyed double take at the bear, and later a look up at the sky as the sun sets.
@@ -1167,9 +1328,13 @@ struct AdventureFrame {
     /// Where the hunter stands in a scene (sprite left edge, within the scene): at the cabin
     /// door after his visit, framed slightly further left at the pond on narrow screens, and
     /// otherwise at the left edge.
-    static func restOffset(game: AdventureGame, scene: Int, sceneWidth: CGFloat) -> CGFloat {
+    static func restOffset(game: AdventureGame, scene: Int, sceneWidth: CGFloat, scale: CGFloat) -> CGFloat {
         guard scene >= 0, scene < game.sceneCount else { return 4 }
         let spec = game.spec(scene)
+        // Back at the fork after the UFO, he sets off from in front of the gate.
+        if game.returnedToFork, spec.hasForkEvent {
+            return ForkLayout(sceneWidth: sceneWidth, scale: scale).hunterAtGate
+        }
         if game.cabinVisited, spec.cabin != nil {
             return cabinDoorOffset(scene: scene, sceneWidth: sceneWidth)
         }
@@ -1359,6 +1524,8 @@ struct PondCast {
             }
 
         case .dogStartled:
+            // Wide-eyed: that last shot was right by him and Max.
+            fishermanSprite = "fisherman_shocked"
             dogSprite = "dog_stand"
             showsBang = t >= Timing.bangShows && t < Timing.dogRuns
             if t >= Timing.dogRuns {
@@ -1373,6 +1540,7 @@ struct PondCast {
             dogLeft = sceneWidth + 60
             if t < Timing.yellHides {
                 fishermanLine = AdventureGame.fishermanYell
+                fishermanSprite = "fisherman_shocked"
             } else {
                 // Pole put away; he turns and runs after Max.
                 showsRod = false
@@ -1786,6 +1954,25 @@ struct ForkLayout {
     var hunterThroughGate: CGFloat { fenceLeft + AppArt.fenceGateWidth / 2 - AppArt.hunterBodyCenterX }
 }
 
+/// Where everything sits at the hunter's own camp (scene-local art pixels, sprite centers).
+struct OwnCampLayout {
+    let chairX: CGFloat
+    let fireX: CGFloat
+    let tableX: CGFloat
+    let backpackX: CGFloat
+    let coolerX: CGFloat
+    let tentX: CGFloat
+
+    init(sceneWidth width: CGFloat) {
+        tentX = min((width * 0.70).rounded(), width - AppArt.tent.width / 2 - 6)
+        chairX = (width * 0.26).rounded()
+        fireX = (width * 0.36).rounded()
+        tableX = (width * 0.47).rounded()
+        backpackX = tableX + AppArt.foldingTable.width / 2 + 7
+        coolerX = (width * 0.17).rounded()
+    }
+}
+
 /// Where the RV, the campfire, and the campers sit at the campsite (scene-local art pixels).
 struct CampsiteLayout {
     let rvCenterX: CGFloat
@@ -1841,6 +2028,36 @@ struct CampsiteLayout {
 
 #Preview("UFO leaving") {
     AdventureView(game: .preview(scene: 14, phase: .abduction(start: .now.addingTimeInterval(-8.6)), route: .restricted))
+        .ignoresSafeArea()
+}
+
+#Preview("Drop-off: lowered down") {
+    AdventureView(game: .preview(scene: 14, phase: .dropOff(start: .now.addingTimeInterval(-3.8)), route: .restricted))
+        .ignoresSafeArea()
+}
+
+#Preview("Drop-off: looking up") {
+    AdventureView(game: .preview(scene: 14, phase: .dropOff(start: .now.addingTimeInterval(-6.3)), route: .restricted))
+        .ignoresSafeArea()
+}
+
+#Preview("Drop-off: scratching his head") {
+    AdventureView(game: .preview(scene: 14, phase: .dropOff(start: .now.addingTimeInterval(-8.1)), route: .restricted))
+        .ignoresSafeArea()
+}
+
+#Preview("Fork: back through the gate") {
+    AdventureView(game: .preview(scene: 12, phase: .forkReturn(start: .now.addingTimeInterval(-3.4)), route: .campground, night: true))
+        .ignoresSafeArea()
+}
+
+#Preview("His camp") {
+    AdventureView(game: .preview(scene: 14, phase: .ownCamp(start: .now.addingTimeInterval(-1.2)), route: .campground, night: true))
+        .ignoresSafeArea()
+}
+
+#Preview("His camp: snoring") {
+    AdventureView(game: .preview(scene: 14, phase: .ownCamp(start: .now.addingTimeInterval(-6.5)), route: .campground, night: true))
         .ignoresSafeArea()
 }
 

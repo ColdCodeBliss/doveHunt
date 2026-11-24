@@ -32,11 +32,16 @@ nonisolated final class SoundEffects: @unchecked Sendable {
         "gunshot", "squawk", "quack", "quack_down", "roar", "wind", "ufo_arrive", "ufo_beam",
         "console_beep_0", "console_beep_1", "console_beep_2", "console_beep_3",
         "console_correct", "console_error", "console_alarm", "console_granted",
-        "gurgle", "alien_gibberish", "squeaky_fart", "glass_shatter", "alien_scream", "bone_rattle", "whistle",
+        "gurgle", "alien_gibberish", "squeaky_fart", "glass_shatter", "alien_scream", "bone_rattle", "whistle", "water_splash", "gate_clank", "snore",
         "step_grass_1", "step_grass_2", "step_grass_3",
         "step_wood_1", "step_wood_2", "step_wood_3",
     ]
     private static let voicesPerSound = 3
+    /// Extra sounds made by playing a file at another speed (and so pitch): name → (file, rate).
+    private static let variants: [String: (file: String, rate: Float)] = [
+        // The recorded fart, slower and deeper: the big finale.
+        "big_fart": ("squeaky_fart", 0.7),
+    ]
 
     /// Only touched on `queue`.
     private let queue = DispatchQueue(label: "com.ColdCodeBliss.doveHunt.sound", qos: .userInteractive)
@@ -56,6 +61,14 @@ nonisolated final class SoundEffects: @unchecked Sendable {
                     player?.prepareToPlay()
                     return player
                 }
+            }
+            for (name, variant) in Self.variants {
+                guard let url = Bundle.main.url(forResource: variant.file, withExtension: "wav"),
+                      let player = try? AVAudioPlayer(contentsOf: url) else { continue }
+                player.enableRate = true
+                player.rate = variant.rate
+                player.prepareToPlay()
+                players[name] = [player]
             }
         }
     }
@@ -103,6 +116,14 @@ nonisolated final class SoundEffects: @unchecked Sendable {
 
     /// The hunter's carefree whistle.
     func whistle() { play("whistle", volume: 0.6) }
+
+    /// The UFO restroom: a splash, and the big finale.
+    func waterSplash() { play("water_splash", volume: 0.7) }
+    func bigFart() { play("big_fart", volume: 0.85) }
+
+    /// The gate slamming shut, and the hunter snoring in his tent.
+    func gateClank() { play("gate_clank", volume: 0.75) }
+    func snore() { play("snore", volume: 0.75) }
 
     /// One footstep, cycling through the variants so a walk doesn't sound mechanical.
     func step(on surface: StepSurface) {

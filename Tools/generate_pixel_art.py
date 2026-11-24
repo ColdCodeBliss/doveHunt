@@ -652,9 +652,10 @@ def hunter(pose="stand"):
     # "unarmed_shocked", and "stomach" (clutching his belly, wide-eyed).
     unarmed = pose.startswith("unarmed") or pose == "stomach"
     scratch = pose == "scratch"
+    aim = pose == "aim"
     stomach = pose == "stomach"
     base = {"unarmed": "stand", "unarmed_a": "a", "unarmed_b": "b", "unarmed_shocked": "shocked", "stomach": "shocked",
-            "scratch": "stand"}.get(pose, pose)
+            "scratch": "stand", "aim": "stand"}.get(pose, pose)
     look_up = base == "look_up"
     shocked = base == "shocked"
     back_dx, front_dx = {"stand": (0, 0), "look_up": (0, 0), "shocked": (0, 0), "a": (-2, 2), "b": (1, -1)}[base]
@@ -782,6 +783,31 @@ def hunter(pose="stand"):
             put(x, y, plaid_at(x, y))
             put(x, y + 1, plaid_at(x, y + 1))
             put(x, y + 2, plaid_dark)
+
+    if aim:
+        # Aiming: the shotgun shouldered and level, sighting straight ahead.
+        for x in range(5, 36):
+            if x < 12:
+                put(x, 17, wood_light)
+                put(x, 18, wood)
+                put(x, 19, wood_dark)
+            elif x < 15:
+                put(x, 17, steel)
+                put(x, 18, steel_dark)
+                put(x, 19, steel_dark)
+            elif x < 20:
+                put(x, 17, wood_light)
+                put(x, 18, wood_dark)
+            else:
+                put(x, 17, steel_light)
+                put(x, 18, steel)
+        sleeve(8, 16, 12, 18)                                                   # rear arm to the grip
+        sleeve(15, 16, 19, 16)                                                  # front arm to the forend
+        for hx, hy in ((12, 19), (19, 18)):
+            put(hx, hy, skin)
+            put(hx + 1, hy, skin)
+        put(14, 9, eye)                                                         # squinting down the barrel
+        return outlined(c, hex_color("#26263A"))
 
     if scratch:
         # Puzzled: shotgun hanging from his rear hand, muzzle down, while his front hand
@@ -1295,8 +1321,10 @@ def fisherman(pose="stand"):
     boot = H("#2E3420")
     strap = H("#2E2E24")
     eye = H("#101018")
-    running = pose != "stand"
-    back_dx, front_dx = {"stand": (0, 0), "a": (-3, 3), "b": (2, -2)}[pose]
+    # "shocked" is the standing pose (still holding the rod) with wide eyes and a dropped jaw.
+    shocked = pose == "shocked"
+    running = pose not in ("stand", "shocked")
+    back_dx, front_dx = {"stand": (0, 0), "shocked": (0, 0), "a": (-3, 3), "b": (2, -2)}[pose]
 
     # Wader legs and boots.
     for x0, dx in ((6, back_dx), (11, front_dx)):
@@ -1344,6 +1372,17 @@ def fisherman(pose="stand"):
         put(x, 5, hat_band)
     for x in range(6, 19):
         put(x, 6, hat_shade)
+    if shocked:
+        for x in range(12, 15):
+            put(x, 7, beard)                                                    # raised brow
+            put(x, 8, H("#FFFFFF"))
+            put(x, 9, H("#FFFFFF"))
+        put(13, 8, eye)
+        put(13, 9, eye)
+        put(13, 12, H("#5A1E1E"))                                               # mouth agape in the beard
+        put(14, 12, H("#5A1E1E"))
+        put(13, 13, H("#5A1E1E"))
+        put(14, 13, H("#5A1E1E"))
     return outlined(c, H("#26263A"))
 
 
@@ -1879,7 +1918,7 @@ def dirt_path():
     return c
 
 
-def alien(pose="stand", coat=False, clipboard=False, scared=False):
+def alien(pose="stand", coat=False, clipboard=False, scared=False, angry=False, carry=False):
     """A little green alien in a silver suit, facing right: a big head with a huge black eye.
     Poses: "stand", and walking strides "a"/"b". `coat` puts it in a white lab coat, `clipboard`
     has it holding one, and `scared` gives it wide, white-rimmed eyes and a screaming mouth."""
@@ -1915,12 +1954,26 @@ def alien(pose="stand", coat=False, clipboard=False, scared=False):
                 c.set(x, y, H("#101018"))                                       # big slanted almond eye
         c.set(16, 7, H("#5A5A70"))                                              # glint
         c.set(17, 13, skin_dark)                                                # mouth
+    if angry:
+        # A scowl: the top of the eye cut off by a heavy, slanted brow, and a frown.
+        for x in range(12, 20):
+            c.set(x, 6, skin)
+        for (x, y) in ((12, 5), (13, 5), (14, 6), (15, 6), (16, 7), (17, 7), (18, 7)):
+            c.set(x, y, H("#163A1C"))
+        c.set(17, 13, skin)
+        for (x, y) in ((15, 14), (16, 13), (17, 13), (18, 14)):
+            c.set(x, y, skin_dark)
     if coat:
         c.rect(7, 28, 15, 31, suit)                                             # coat tails
         c.set(11, 20, suit_dark)                                                # lapels
         c.set(11, 22, suit_dark)
         c.set(11, 24, suit_dark)
-    if clipboard:
+    if carry:
+        thick_line(c, 13, 20, 15, 13, 2, skin)                                  # both arms up, carrying
+        thick_line(c, 8, 20, 6, 13, 2, skin_dark)
+        c.rect(14, 11, 17, 13, skin)
+        c.rect(5, 11, 8, 13, skin_dark)
+    elif clipboard:
         thick_line(c, 13, 20, 15, 23, 2, skin)                                  # arm bent, holding it up
         c.rect(15, 19, 21, 27, H("#8B5A2B"))                                    # clipboard
         c.rect(16, 21, 20, 26, H("#F4F4EE"))
@@ -2085,6 +2138,99 @@ def clipboard():
     for y in (6, 8, 10, 12):
         c.rect(3, y, 9 if y != 12 else 6, y + 1, H("#6FBF6F"))                  # squiggly alien notes
     return outlined(c, H("#2A1A0C"))
+
+
+def tent():
+    """The hunter's A-frame tent: olive canvas, a darker door flap tied open, guy lines, pegs."""
+    w, h = 56, 36
+    c = Canvas(w, h)
+    H = hex_color
+    canvas_light, canvas_mid, canvas_dark = H("#8A9A5B"), H("#6E7E44"), H("#4E5A30")
+    for y in range(2, h - 1):
+        half = int((y - 2) / (h - 3) * 24) + 2
+        for x in range(28 - half, 28 + half):
+            c.set(x, y, canvas_light if x < 28 else canvas_mid)
+    for y in range(12, h - 1):                                                  # open door, dark inside
+        half = int((y - 12) / (h - 13) * 8) + 1
+        for x in range(28 - half, 28 + half):
+            c.set(x, y, H("#1A1A14"))
+    for y in range(12, h - 1):                                                  # tied-back flaps
+        half = int((y - 12) / (h - 13) * 8) + 1
+        c.set(28 - half - 1, y, canvas_dark)
+        c.set(28 + half, y, canvas_dark)
+    thick_line(c, 28, 0, 28, 3, 1, H("#5A3519"))                                # pole tip
+    for (x0, x1) in ((5, 0), (51, 55)):                                         # guy lines and pegs
+        thick_line(c, x0, 14, x1, h - 2, 1, H("#C9C2A8"))
+    c.rect(0, h - 3, 2, h, H("#8C939E"))
+    c.rect(w - 2, h - 3, w, h, H("#8C939E"))
+    return outlined(c, H("#2A2E1A"))
+
+
+def firepit_unlit():
+    """A ring of stones around a few unlit logs."""
+    c = Canvas(18, 9)
+    H = hex_color
+    thick_line(c, 4, 6, 13, 4, 2, H("#6B4527"))
+    thick_line(c, 4, 4, 13, 6, 2, H("#5A3519"))
+    for x in range(0, 18, 3):
+        c.rect(x, 6, x + 2, 9, H("#8C939E") if x % 2 else H("#6E7684"))
+    c.set(8, 5, H("#3A3A3A"))                                                   # old ash
+    c.set(9, 5, H("#4A4A4A"))
+    return outlined(c, H("#22222C"))
+
+
+def camp_chair():
+    """An empty folding camp chair (blue canvas, crossed legs), facing right."""
+    c = Canvas(18, 18)
+    H = hex_color
+    chair, chair_dark = H("#2F6E9E"), H("#1F4A6E")
+    c.rect(2, 0, 5, 10, chair_dark)                                             # backrest
+    c.rect(3, 8, 15, 11, chair)                                                 # seat
+    thick_line(c, 4, 11, 14, 17, 1, chair_dark)
+    thick_line(c, 14, 11, 4, 17, 1, chair_dark)
+    c.rect(13, 6, 16, 7, chair_dark)                                            # armrest
+    return outlined(c, H("#141E2A"))
+
+
+def folding_table():
+    """A little fold-out camp table with a lantern, a mug, and a couple of cans on top."""
+    c = Canvas(28, 20)
+    H = hex_color
+    top, leg = H("#C9CED8"), H("#6E7684")
+    c.rect(1, 8, 27, 10, top)
+    thick_line(c, 4, 10, 10, 19, 1, leg)
+    thick_line(c, 10, 10, 4, 19, 1, leg)
+    thick_line(c, 18, 10, 24, 19, 1, leg)
+    thick_line(c, 24, 10, 18, 19, 1, leg)
+    c.rect(4, 2, 9, 8, H("#3A3F4E"))                                            # lantern
+    c.rect(5, 3, 8, 7, H("#FFE27A"))
+    c.rect(5, 0, 8, 2, H("#3A3F4E"))
+    c.rect(13, 5, 16, 8, H("#C8382E"))                                          # mug
+    c.set(16, 6, H("#C8382E"))
+    c.rect(19, 4, 21, 8, H("#9AA2AE"))                                          # cans
+    c.rect(22, 5, 24, 8, H("#D9A562"))
+    return outlined(c, H("#22222C"))
+
+
+def backpack():
+    """A green hiking backpack with a rolled sleeping mat on top."""
+    c = Canvas(12, 15)
+    H = hex_color
+    c.rect(1, 4, 11, 15, H("#4E7A3A"))
+    c.rect(3, 8, 9, 12, H("#3E6230"))                                           # front pocket
+    c.rect(1, 1, 11, 4, H("#C8641A"))                                           # sleeping mat
+    c.rect(2, 1, 3, 4, H("#9A4A12"))
+    return outlined(c, H("#1E2A16"))
+
+
+def cooler():
+    """A red-and-white camp cooler."""
+    c = Canvas(16, 11)
+    H = hex_color
+    c.rect(1, 3, 15, 11, H("#C8382E"))
+    c.rect(1, 1, 15, 4, H("#F4F4EE"))                                           # lid
+    c.rect(6, 0, 10, 1, H("#9AA2AE"))                                           # handle
+    return outlined(c, H("#2A1414"))
 
 
 def padlock(glow=False):
@@ -2438,7 +2584,17 @@ def main():
     for kind in ("dove", "mallard"):
         write_imageset(f"skeleton_{kind}_coat", bird_skeleton(kind, coat=True).px, APP_OUTPUT_DIR)
     write_imageset("scientist_bare", alien("stand", coat=True).px, APP_OUTPUT_DIR)
+    write_imageset("alien_angry", alien("stand", angry=True).px, APP_OUTPUT_DIR)
+    for pose, suffix in (("stand", ""), ("a", "_a"), ("b", "_b")):
+        write_imageset(f"alien_carry{suffix}", alien(pose, angry=True, carry=True).px, APP_OUTPUT_DIR)
     write_imageset("hunter_scratch", hunter("scratch").px, APP_OUTPUT_DIR)
+    write_imageset("hunter_aim", hunter("aim").px, APP_OUTPUT_DIR)
+    write_imageset("tent", tent().px, APP_OUTPUT_DIR)
+    write_imageset("firepit_unlit", firepit_unlit().px, APP_OUTPUT_DIR)
+    write_imageset("camp_chair", camp_chair().px, APP_OUTPUT_DIR)
+    write_imageset("folding_table", folding_table().px, APP_OUTPUT_DIR)
+    write_imageset("backpack", backpack().px, APP_OUTPUT_DIR)
+    write_imageset("cooler", cooler().px, APP_OUTPUT_DIR)
     for pose, suffix in (("stand", ""), ("a", "_walk_a"), ("b", "_walk_b")):
         write_imageset(f"scientist{suffix}", alien(pose, coat=True, clipboard=True).px, APP_OUTPUT_DIR)
         write_imageset(f"scientist_scared{suffix}", alien(pose, coat=True, scared=True).px, APP_OUTPUT_DIR)
@@ -2457,7 +2613,7 @@ def main():
     write_imageset("arrow_right", arrow_right().px, APP_OUTPUT_DIR)
     write_imageset("arrow_down", arrow_down().px, APP_OUTPUT_DIR)
     write_imageset("crate_icon", crate_icon().px, APP_OUTPUT_DIR)
-    for pose, name in (("stand", "fisherman"), ("a", "fisherman_run_a"), ("b", "fisherman_run_b")):
+    for pose, name in (("stand", "fisherman"), ("shocked", "fisherman_shocked"), ("a", "fisherman_run_a"), ("b", "fisherman_run_b")):
         write_imageset(name, fisherman(pose).px, APP_OUTPUT_DIR)
     for pose, name in (("sit", "dog_sit"), ("stand", "dog_stand"), ("a", "dog_run_a"), ("b", "dog_run_b")):
         write_imageset(name, dog(pose).px, APP_OUTPUT_DIR)

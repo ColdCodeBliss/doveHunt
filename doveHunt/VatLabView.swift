@@ -38,12 +38,18 @@ struct VatLabView: View {
         let leave = leavingTime.map { min($0 / Timing.leaveDuration, 1) } ?? 0
         let hunterX = -hunterWidth / 2 + (standX + hunterWidth / 2) * walkIn + (w + hunterWidth - standX) * leave
         let hunterWalking = walkIn < 1 || (leave > 0 && leave < 1)
+        // Stopped dead and wide-eyed at the sight of the vats, then the shotgun comes level at them.
+        let aiming = t >= Timing.aimStarts && t < Timing.aimEnds
         let hunterSprite: String = {
             if hunterWalking { return AppArt.hunterWalkCycle[Int(elapsed * AdventureGame.walkFrameRate) % AppArt.hunterWalkCycle.count] }
+            if t >= Timing.walkInDuration, t < Timing.stunnedEnds { return "hunter_shocked" }
+            if aiming { return "hunter_aim" }
             if t >= Timing.shockedStarts, t < Timing.shockedEnds { return "hunter_shocked" }
             return "hunter"
         }()
-        let hunterCenter = layout.standing(AppArt.hunter, x: hunterX)
+        // A little kick back with each shot.
+        let recoil: CGFloat = aiming && game.isFiring ? -2 * s : 0
+        let hunterCenter = layout.standing(AppArt.hunter, x: hunterX + recoil)
         let hunterTop = hunterCenter.y - AppArt.hunter.height * s / 2
 
         // The vats, and when each one is shot.
@@ -107,8 +113,9 @@ struct VatLabView: View {
             AppSprite(name: hunterSprite, size: AppArt.hunter, scale: s)
                 .position(hunterCenter)
             if game.isFiring {
+                let muzzle = aiming ? AppArt.hunterAimMuzzle : AppArt.hunterMuzzle
                 AppSprite(name: "muzzle_flash", size: AppArt.muzzleFlash, scale: s)
-                    .position(x: hunterX - hunterWidth / 2 + AppArt.hunterMuzzle.x * s, y: hunterTop + AppArt.hunterMuzzle.y * s)
+                    .position(x: hunterX + recoil - hunterWidth / 2 + muzzle.x * s, y: hunterTop + muzzle.y * s)
             }
 
             if t >= Timing.screamShows, t < Timing.screamHides {
@@ -246,6 +253,11 @@ struct VatLabView: View {
 #if DEBUG
 #Preview("Vats: floating") {
     AdventureView(game: .preview(scene: 14, phase: .vats(.scripted, start: .now.addingTimeInterval(-2.2)), route: .restricted))
+        .ignoresSafeArea()
+}
+
+#Preview("Vats: aim") {
+    AdventureView(game: .preview(scene: 14, phase: .vats(.scripted, start: .now.addingTimeInterval(-3.3)), route: .restricted))
         .ignoresSafeArea()
 }
 

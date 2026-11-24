@@ -370,6 +370,57 @@ def whistle(rng, length=3.2):
     return out
 
 
+def water_splash(rng, length=0.7):
+    """A small plop into water: a quick watery burst and a couple of rising bubble bloops."""
+    n = int(RATE * length)
+    noise = band_pass([rng.uniform(-1, 1) for _ in range(n)], 900, 1.2)
+    out = [noise[i] * math.exp(-(i / RATE) / 0.08) * 1.4 for i in range(n)]
+    for start, f0 in ((0.0, 300), (0.12, 520), (0.26, 680)):
+        phase = 0.0
+        for k in range(int(0.12 * RATE)):
+            t = k / RATE
+            phase += 2 * math.pi * f0 * (1 + 2.5 * t / 0.12) / RATE
+            i = int(start * RATE) + k
+            if i < n:
+                out[i] += math.sin(phase) * math.sin(math.pi * t / 0.12) * 0.7
+    return out
+
+
+def gate_clank(rng, length=0.9):
+    """A chain-link gate slamming shut: a sharp hit and a ringing, inharmonic metal rattle."""
+    n = int(RATE * length)
+    out = []
+    partials = [(520, 0.9), (1230, 0.6), (2110, 0.45), (3380, 0.3)]
+    for i in range(n):
+        t = i / RATE
+        ring = sum(math.sin(2 * math.pi * f * t) * a for f, a in partials) * math.exp(-t / 0.18)
+        rattle = rng.uniform(-1, 1) * math.exp(-t / 0.05) * 1.2
+        out.append(ring * (0.85 + 0.15 * math.sin(2 * math.pi * 31 * t)) + rattle)
+    return out
+
+
+def snore(rng, cycles=2):
+    """Big, rattling snores: a fluttering, nasal inhale and a soft, breathy exhale."""
+    out = []
+    for _ in range(cycles):
+        inhale = int(RATE * 1.5)
+        noise = low_pass([rng.uniform(-1, 1) for _ in range(inhale)], 500)
+        phase = 0.0
+        for i in range(inhale):
+            t = i / RATE
+            p = t / 1.5
+            phase += 2 * math.pi * (85 + 25 * p) / RATE
+            flutter = 0.55 + 0.45 * math.sin(2 * math.pi * 28 * t)
+            out.append((noise[i] * 2.5 + math.sin(phase) * 0.5) * flutter * math.sin(math.pi * p))
+        exhale = int(RATE * 1.3)
+        breath = band_pass([rng.uniform(-1, 1) for _ in range(exhale)], 1400, 1.5)
+        for i in range(exhale):
+            p = i / exhale
+            out.append(breath[i] * 0.6 * math.sin(math.pi * p))
+        out.extend([0.0] * int(RATE * 0.4))
+    return out
+
+
 def grass_step(rng, pitch):
     """A soft, crunchy rustle of boots in grass: a cluster of tiny filtered noise grains."""
     n = int(RATE * 0.16)
@@ -411,7 +462,10 @@ def main():
     write_wav("roar", roar(random.Random("roar")), peak=0.9)
     write_wav("alien_gibberish", gibberish(random.Random("gibberish")), peak=0.7)
     write_wav("glass_shatter", glass_shatter(random.Random("glass")), peak=0.8)
-    write_wav("whistle", whistle(random.Random("whistle")), peak=0.6)
+    write_wav("water_splash", water_splash(random.Random("splash")), peak=0.7)
+    write_wav("gate_clank", gate_clank(random.Random("clank")), peak=0.75)
+    write_wav("snore", snore(random.Random("snore")), peak=0.75)
+    # whistle.wav is a recorded tune (converted from an MP3 download), not generated.
     write_wav("alien_scream", alien_scream(random.Random("scream")), peak=0.75)
     write_wav("bone_rattle", bone_rattle(random.Random("bones")), peak=0.75)
     # gurgle.wav and squeaky_fart.wav are recorded sounds (converted from MP3 downloads), not
